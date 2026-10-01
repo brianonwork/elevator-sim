@@ -70,36 +70,14 @@ FAIRNESS_TRADE_DIR = FIGURES / "fairness-efficiency"
 in every cell both ran (``write_fairness_tradeoff``)."""
 
 
-@dataclass(frozen=True)
-class HeatmapNumber:
-    """One ``runs.csv`` column, with the title and unit the pattern pages label it by.
-
-    Named for the heatmaps it was written for; those are retired, but ``pattern_rows``
-    still reads its titles and units.
-    """
-
-    slug: str
-    """Short name, e.g. ``"trip_avg"``; it named the retired ``heatmap_trip_avg.png``."""
-    column: str
-    """The ``runs.csv`` column read, e.g. ``"total_mean"``."""
-    title: str
-    """Figure title, matching the summary's numbers table."""
-    unit: str
-    """Unit of the column: ``"ticks"`` or ``"seconds"``. Every number is better smaller."""
-
-
-HEATMAP_NUMBERS = (
-    HeatmapNumber("trip_avg", "total_mean", "Average trip time", "ticks"),
-    HeatmapNumber("trip_p95", "total_p95", "95-in-100 trip time", "ticks"),
-    HeatmapNumber("trip_max", "total_max", "Longest trip time", "ticks"),
-    HeatmapNumber("trip_min", "total_min", "Shortest trip time", "ticks"),
-    HeatmapNumber("wait_avg", "wait_mean", "Average wait", "ticks"),
-    HeatmapNumber("wait_p95", "wait_p95", "95-in-100 wait", "ticks"),
-    HeatmapNumber("wait_max", "wait_max", "Longest wait", "ticks"),
-    HeatmapNumber("wait_min", "wait_min", "Shortest wait", "ticks"),
-    HeatmapNumber("compute", "seconds", "Computer time", "seconds"),
-)
-"""Every per-run number in the summary's numbers table, with its title and unit."""
+NUMBER_LABELS = {
+    "total_mean": ("Average trip time", "ticks"),
+    "total_p95": ("95-in-100 trip time", "ticks"),
+    "total_max": ("Longest trip time", "ticks"),
+    "wait_mean": ("Average wait", "ticks"),
+}
+"""``runs.csv`` column to the title and unit the per-pattern pages label it by, matching the
+names in the trial design's numbers table. Only the columns those pages draw."""
 
 def header(*names: str) -> list[str]:
     """Return a markdown header row and its separator, so the two can never disagree.
@@ -248,12 +226,11 @@ def pattern_rows(preset: Preset) -> list[PatternRow]:
     Returns:
         The mean total time (``JUDGED_ON``), then 95-in-100 and longest trip and average wait.
     """
-    by_column = {n.column: n for n in HEATMAP_NUMBERS}
-    judged = by_column[JUDGED_ON]
-    rows = [PatternRow(judged.title, judged.column, judged.unit, answers=True)]
+    title, unit = NUMBER_LABELS[JUDGED_ON]
+    rows = [PatternRow(title, JUDGED_ON, unit, answers=True)]
     for column in PATTERN_STANDARD_COLUMNS:
-        n = by_column[column]
-        rows.append(PatternRow(n.title, n.column, n.unit))
+        title, unit = NUMBER_LABELS[column]
+        rows.append(PatternRow(title, column, unit))
     return rows
 
 
@@ -715,7 +692,9 @@ def experiment_section(rows: Sequence[dict], experiment: str, variant: str) -> l
     return out
 
 
-def write_report(path: Path = REPORT) -> Path:
+def write_report(
+    path: Path = REPORT, results: Path = RESULTS, fairness: Path = FAIRNESS
+) -> Path:
     """Write the markdown report from every experiment's results and, if present, the sweep.
 
     Sections, in order: an introduction on how to read the tables, a warning if any cell
@@ -725,14 +704,16 @@ def write_report(path: Path = REPORT) -> Path:
 
     Args:
         path: Where to write the report; parent directories are created.
+        results: The ``runs.csv`` to report on.
+        fairness: The exponent sweep's CSV; its section is written only if this exists.
 
     Returns:
         ``path``, once written.
 
     Raises:
-        FileNotFoundError: ``runs.csv`` does not exist yet.
+        FileNotFoundError: ``results`` does not exist yet.
     """
-    rows = read_rows()
+    rows = read_rows(results)
     uneven = uneven_cells(rows)
     # ``out`` collects the report line by line; it is joined with newlines at the end.
     out = [
@@ -780,14 +761,14 @@ def write_report(path: Path = REPORT) -> Path:
             "test's.", "",
             *fairness_tradeoff_table(fairness_tradeoff(group(rows))), ""]
     # The fairness sweep is a follow-up command, so its section is optional.
-    if FAIRNESS.exists():
+    if fairness.exists():
         out += ["## Fairness sweep (follow-up)", "",
                 "The cost exponent swept with the environment held at one cell "
                 f"({BY_NUMBER[FAIRNESS_PRESET].name} on B1) -- a single cell and not an "
                 "experiment, run as a follow-up. One run per seed is recorded in "
                 "`exponent_sweep.csv`, so this comparison can be paired per seed like every "
                 "other in this report. Raising `p` should trade mean for max.", "",
-                *fairness_table(fairness_rows()), ""]
+                *fairness_table(fairness_rows(fairness)), ""]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(out))
     return path

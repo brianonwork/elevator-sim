@@ -87,9 +87,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         requests = read_requests(args.requests)
         sim = Simulation(config, create(args.scheduler, config), requests)
         result = sim.run(max_ticks=args.max_ticks)
-    # RuntimeError is the controller replay's own runaway guard (``controller.simulate``):
-    # the cost schedulers hit it before the engine notices the run has stalled.
-    except (OSError, ValueError, RuntimeError, SchedulingError, SimulationStalled) as e:
+    # SchedulingError includes ReplayError, the controller replay's own runaway guard
+    # (``controller.simulate``): the cost schedulers hit it before the engine notices the
+    # run has stalled. Any other RuntimeError is a bug and keeps its traceback.
+    except (OSError, ValueError, SchedulingError, SimulationStalled) as e:
         print(f"elevator-sim: {e}", file=sys.stderr)
         return 1
 

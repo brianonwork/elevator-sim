@@ -7,6 +7,11 @@ commands sit outside the reported results: ``sweep`` reruns a few presets at a r
 demands (demand = arrival rate as a fraction of the fleet's nominal throughput, see
 ``presets.rate_for``) and ``fairness`` sweeps the cost exponent at one cell.
 
+Everything is read from and written to one results directory: ``docs/results`` under the
+working directory, or wherever ``--results-dir`` points. The default is only used where it
+already exists, so a command run away from the repository root stops with a message
+instead of starting every experiment again in a new ``docs/`` tree.
+
 Each subcommand is a ``cmd_*`` function taking the parsed arguments and returning the
 process exit code. Exit codes: 0 success; 1 if ``run`` had failed cells, if ``main`` caught
 an expected error (a missing file, a scheduler bug -- printed as one line), or if a preset
@@ -35,6 +40,47 @@ from .presets import (
     traffic_for,
 )
 from .traffic import write_requests
+
+DEFAULT_RESULTS_DIR = Path("docs/results")
+"""Results directory when ``--results-dir`` is not given, relative to the working directory."""
+
+
+def results_dir(args: argparse.Namespace, *, writing: bool) -> Path:
+    """Return the results directory a command works in.
+
+    Args:
+        args: Parsed arguments; uses ``results_dir`` (``None`` = not given).
+        writing: Whether the command creates results. A command that only reads leaves a
+            missing directory to its own "file not found" message.
+
+    Returns:
+        ``--results-dir`` if given (it is created as needed), else ``DEFAULT_RESULTS_DIR``.
+
+    Raises:
+        ValueError: ``--results-dir`` was not given, the command writes, and there is no
+            ``docs/results`` under the working directory.
+    """
+    if args.results_dir is not None:
+        return args.results_dir
+    if writing and not DEFAULT_RESULTS_DIR.is_dir():
+        raise ValueError(
+            f"no {DEFAULT_RESULTS_DIR} under {Path.cwd()}; run from the repository root "
+            f"or pass --results-dir"
+        )
+    return DEFAULT_RESULTS_DIR
+
+
+def data_file(directory: Path, default: Path) -> Path:
+    """Return where one of the harness's CSVs lives inside a results directory.
+
+    Args:
+        directory: The results directory.
+        default: The file's default path, e.g. ``runner.RESULTS``; only its name is used.
+
+    Returns:
+        ``directory / "data" / <name>``.
+    """
+    return directory / "data" / default.name
 
 
 def preset_named(name: str) -> Preset:
@@ -108,8 +154,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     presets = [preset_named(n) for n in args.preset] if args.preset else PRESETS
     buildings = [BY_NAME[n] for n in args.building] if args.building else BUILDINGS
     todo = list(runner.cells(presets, buildings))
+    results = data_file(results_dir(args, writing=True), runner.RESULTS)
+    series = results.parent / runner.SERIES.name
     print(f"{len(todo)} cells in scope; already-finished ones are skipped")
-    stale = runner.stale_cells()
+    print(f"results: {results.resolve()}")
+    stale = runner.stale_cells(results)
     # Show only the first five stale rows; the count says how many there are.
     if stale:
         print(f"warning: {len(stale)} existing row(s) were generated at a different arrival "
@@ -117,13 +166,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         for line in stale[:5]:
             print(f"  {line}")
     # Resume skips a finished cell whatever code produced it, so say when the code moved.
-    if runner.source_changed():
-        print(f"warning: the simulator or trial source has changed since {runner.RESULTS} was "
+    if runner.source_changed(results):
+        print(f"warning: the simulator or trial source has changed since {results} was "
               f"recorded (or it has no {runner.STAMP}); finished cells will not be re-run. "
-              f"If the change can move results, delete {runner.RESULTS} and "
-              f"{runner.SERIES} and run again.")
-    result = runner.run_all(todo, jobs=args.jobs)
-    print(f"{result.written} new rows in {runner.RESULTS}; "
+              f"If the change can move results, delete {results} and "
+              f"{series} and run again.")
+    result = runner.run_all(todo, path=results, jobs=args.jobs)
+    print(f"{result.written} new rows in {results}; "
           f"{result.series_backfilled} cell(s) had only their series backfilled")
     # Any failure makes the exit code 1, so a script can tell the run is incomplete.
     if result.failures:
@@ -147,9 +196,10 @@ def cmd_fairness(args: argparse.Namespace) -> int:
     Returns:
         0.
     """
-    written = runner.run_fairness()
-    print(f"{written} rows in {runner.FAIRNESS}")
-    for line in report.fairness_table(report.fairness_rows()):
+    path = data_file(results_dir(args, writing=True), runner.FAIRNESS)
+    written = runner.run_fairness(path=path)
+    print(f"{written} rows in {path}")
+    for line in report.fairness_table(report.fairness_rows(path)):
         print(f"  {line}")
     return 0
 
@@ -164,8 +214,9 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         0.
     """
     print(f"Sweeping demand over {runner.SWEEP_LOADS} on {', '.join(runner.SWEEP_PRESETS)}")
-    written = runner.run_sweep(jobs=args.jobs)
-    print(f"{written} rows in {runner.LOAD_SWEEP}")
+    path = data_file(results_dir(args, writing=True), runner.LOAD_SWEEP)
+    written = runner.run_sweep(path=path, jobs=args.jobs)
+    print(f"{written} rows in {path}")
     return 0
 
 
@@ -178,11 +229,16 @@ def cmd_report(args: argparse.Namespace) -> int:
     Returns:
         0.
     """
-    path = report.write_report()
+    directory = results_dir(args, writing=False)
+    results = data_file(directory, runner.RESULTS)
+    path = report.write_report(
+        directory / report.REPORT.name, results, data_file(directory, runner.FAIRNESS)
+    )
     print(f"Report: {path}")
     if args.figures:
-        made = report.write_figures()
-        print(f"Figures: {len(made)} in {report.FIGURES}")
+        figures = directory / report.FIGURES.name
+        made = report.write_figures(figures, results)
+        print(f"Figures: {len(made)} in {figures}")
     return 0
 
 
@@ -197,6 +253,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="elevator-trials",
         description="Generate traffic, run the scheduler comparison, and report it.",
+    )
+    parser.add_argument(
+        "--results-dir", type=Path, default=None,
+        help=f"directory the results are read from and written to (default: "
+             f"{DEFAULT_RESULTS_DIR} under the working directory, which must already exist "
+             f"for a command that writes)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

@@ -101,6 +101,9 @@ cars, eight seats per car) in `data/`: the first of the ten the experiments ran,
 `gen <preset> --seed N` with N = 10000 for the first pattern, 20000 for the second, up to 80000.
 Every other file is regenerated the same way from its seed.
 
+The trial commands read and write `docs/results` under the working directory, so run them from the
+repository root, or point them elsewhere with `elevator-trials --results-dir DIR <command>`.
+
 ## Time spent
 
 4.5 hours. A surprising share of it went into refining the trial design and methodology.
@@ -115,7 +118,9 @@ gives the full list, marking each as stated by the prompt or chosen by us, and
 - Requests are released strictly in time order; no scheduler sees the future.
 - A request is bound to one car the tick it appears and is never reassigned, so a rider who does
   not fit waits for that car's next visit. After six round trips of waiting (`12 × floors`
-  ticks), the car keeps a seat free for them, so every wait is bounded.
+  ticks), the car keeps a seat free for them, so every wait ends. It is not a tight cap: a car
+  serves its starved riders one at a time, and [trial design](docs/write-up/4-trial-design.md#physics)
+  reports how often the rule changes a run.
 - Direction logic: a car carrying riders never reverses and picks up only people going its way,
   so a rider going against the sweep waits for the return pass.
 - All cars start idle on floor 1. Any car can stop at any floor; express service is a

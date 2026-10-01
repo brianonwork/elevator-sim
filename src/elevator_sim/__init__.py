@@ -8,7 +8,7 @@ engine (:mod:`.simulation`) only enforces the rules, while a pluggable scheduler
 
 from .algorithms import BUILTINS, available, create
 from .models import BuildingConfig, Direction, ElevatorView, Request, Rider, SimulationState
-from .scheduler import CarAction, Scheduler, SchedulingError
+from .scheduler import CarAction, ReplayError, Scheduler, SchedulingError
 from .simulation import Simulation, SimulationResult, SimulationStalled
 from .stats import Distribution, Summary, distribution, format_summary, percentile, summarize
 
@@ -16,7 +16,8 @@ __version__ = "0.1.0"
 
 __all__ = [
     "BuildingConfig", "Direction", "ElevatorView", "Request", "Rider", "SimulationState",
-    "BUILTINS", "CarAction", "Scheduler", "SchedulingError", "available", "create",
+    "BUILTINS", "CarAction", "ReplayError", "Scheduler", "SchedulingError", "available",
+    "create",
     "Simulation", "SimulationResult", "SimulationStalled",
     "Distribution", "Summary", "distribution", "format_summary", "percentile", "summarize",
 ]

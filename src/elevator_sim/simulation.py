@@ -100,6 +100,8 @@ class Simulation:
         # Requests released during the current tick; reset to empty at the end of each step.
         self._released_now: tuple[Request, ...] = ()
         self.positions_log: PositionsLog = []
+        self._failed: str | None = None
+        """The ``SchedulingError`` message that stopped the run; ``None`` while it is sound."""
 
     # -- observation -----------------------------------------------------------------
 
@@ -135,8 +137,15 @@ class Simulation:
         Raises:
             SchedulingError: the scheduler raised it, or its plan breaks an engine rule. No
                 boarding or movement happens, but the log, release and alight phases have
-                already run and ``time`` has not advanced, so do not step again.
+                already run and ``time`` has not advanced. The tick cannot be finished or
+                undone, so the simulation is stopped: every later call raises again, naming
+                the tick and the original error, rather than replaying half a tick.
         """
+        if self._failed is not None:
+            raise SchedulingError(
+                f"the simulation stopped at tick {self.time} after an invalid plan: "
+                f"{self._failed}"
+            )
         self._log_positions()
         self._release_requests()
         for elevator in self.elevators:
@@ -145,8 +154,12 @@ class Simulation:
                 elevator.held_until = self.time
             self._alight(elevator)
         # Ask the scheduler once for the whole fleet, then board and move from that plan.
-        plan = self.scheduler.step(self.state)
-        self._board(plan)
+        try:
+            plan = self.scheduler.step(self.state)
+            self._board(plan)
+        except SchedulingError as e:
+            self._failed = str(e)
+            raise
         for elevator in self.elevators:
             # A car missing from the plan stays put.
             action = plan.get(elevator.id)

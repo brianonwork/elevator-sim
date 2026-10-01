@@ -31,14 +31,19 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from ..models import BuildingConfig, Direction, ElevatorView, Request
+from ..scheduler import ReplayError
 
 # Short aliases: the rules below compare headings constantly and read better without the
 # ``Direction.`` prefix.
 UP, DOWN, IDLE = Direction.UP, Direction.DOWN, Direction.IDLE
 
 # A round trip is about 2 x floors ticks at stop time 0. Six of them sat above every wait
-# eta-cost produced in the trials before the rule existed, so it only fires on a rider the
-# sweep is actually passing over, not on ordinary queueing.
+# eta-cost produced in the trials before the rule existed, and the rule still never changes
+# an eta-cost run. It does fire for the schedulers that pile riders onto one car: switching
+# it off changes 254 of the 7,910 recorded runs (nearest-car, express and zone-based on the
+# evening rush and local-plus-express, a few on overload), usually shortening the longest
+# wait, without changing which scheduler leads or ties in any cell. See "The starved-rider
+# seat in the experiments" in docs/write-up/4-trial-design.md.
 STARVE_ROUND_TRIPS = 6
 
 
@@ -208,7 +213,7 @@ def _ahead(floor: int, heading: Direction, floors: set[int]) -> set[int]:
 
 def next_heading(
     car: Car, pending: set[int] | None = None, here: Sequence[Request] | None = None,
-    now: int = 0,
+    *, now: int,
 ) -> Direction:
     """Return the direction the car commits to this tick.
 
@@ -244,7 +249,8 @@ def next_heading(
         pending: Precomputed ``stops(car)``; ``None`` = compute it here.
         here: Precomputed ``waiting_here(car)``; ``None`` = compute it here.
         now: The current tick, which decides whether a seat is being kept for a starved
-            rider and so whether a pickup here would board.
+            rider and so whether a pickup here would board. Required: a default would
+            silently switch the starvation rule off for a caller that forgot it.
 
     Returns:
         ``UP``, ``DOWN`` or ``IDLE`` (nothing to do anywhere).
@@ -259,7 +265,7 @@ def next_heading(
         if _ahead(car.floor, car.heading, pending):
             return car.heading
         # Rule 3: nothing ahead, but someone here will board and keep going our way.
-        if pending and boarding(car, car.heading, here, now):
+        if pending and boarding(car, car.heading, here, now=now):
             return car.heading
         # Rule 4: stops only behind, so reverse (Direction is +1/-1, so negation flips it).
         if pending:
@@ -276,7 +282,7 @@ def next_heading(
 
 
 def boarding(
-    car: Car, heading: Direction, here: Sequence[Request] | None = None, now: int = 0,
+    car: Car, heading: Direction, here: Sequence[Request] | None = None, *, now: int,
 ) -> list[Request]:
     """Return the pickups at this floor travelling in ``heading``, in order, up to free capacity.
 
@@ -353,8 +359,8 @@ def plan_car(car: Car, now: int) -> tuple[Direction, list[Request], int | None]:
         this tick, and the floor to move toward (``None`` = stay put).
     """
     pending, here = stops(car), waiting_here(car)
-    heading = next_heading(car, pending, here, now)
-    boarded = boarding(car, heading, here, now)
+    heading = next_heading(car, pending, here, now=now)
+    boarded = boarding(car, heading, here, now=now)
     return heading, boarded, next_target(car, heading, boarded, pending)
 
 
@@ -390,7 +396,7 @@ def simulate(
         Drop-off tick for every rider and pickup, keyed by request id.
 
     Raises:
-        RuntimeError: the replay ran more than ``max_ticks`` ticks without finishing.
+        ReplayError: the replay ran more than ``max_ticks`` ticks without finishing.
     """
     car = car.copy()
     t = now
@@ -400,7 +406,7 @@ def simulate(
     while car.riders or car.pickups:
         # Guard against a rule bug that would otherwise loop forever.
         if t - now > max_ticks:
-            raise RuntimeError("controller replay did not terminate")
+            raise ReplayError("controller replay did not terminate")
         # Alight: drop off anyone whose destination is this floor, and hold the car.
         arrived = [r for r in car.riders if r.dest == car.floor]
         if arrived:

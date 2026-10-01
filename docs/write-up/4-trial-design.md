@@ -82,6 +82,19 @@ experiments also try stops that cost time: 1 tick in every cell of big-bang-1, a
 single cell for the stop-time pair (see [Experiments](#experiments)). Sweeps over demand and over
 the fairness scheduler's own setting are [follow-ups](6-follow-ups.md).
 
+**The starved-rider seat in the experiments.** Every scheduler shares the rule that a car keeps a
+seat for a rider who has waited six round trips ([the algorithms](3-algorithms.md)). It is part of
+the controller, so it is active in every run, and it matters for the schedulers that pile riders
+onto one car. Rerunning every run with the rule switched off changes 254 of the 7,910: 171 on the
+evening rush, 77 on local-plus-express and 6 on overload, almost all under nearest-car, express or
+zone-based, and none under ETA-cost or its fair version. In those runs the rule shortens the
+longest wait in 229 and lengthens the average trip in 175, since a seat held back is a seat not
+used. No case changes its leader or its tied-for-best set, and 9 of the 791 scheduler-by-case
+averages move by more than 1%; the largest is nearest-car on the evening rush in the four-seat
+building with 1-tick stops, 16% slower with the rule. The rule makes every wait end; it does not
+cap it near six round trips, because a car serves its starved riders one at a time. The longest
+recorded wait is about six times the limit.
+
 ## Protocol
 
 Every pattern's guess, in the last column of the traffic table, was written down before the

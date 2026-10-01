@@ -32,6 +32,14 @@ class SchedulingError(Exception):
     """Raised when a scheduler's plan violates an engine constraint."""
 
 
+class ReplayError(SchedulingError):
+    """Raised when a scheduler's own forward replay of a car does not finish.
+
+    A scheduler bug like any other, so it is a ``SchedulingError``: callers that report
+    scheduler failures catch it without also catching every unrelated ``RuntimeError``.
+    """
+
+
 @dataclass(frozen=True)
 class CarAction:
     """What one car does this tick."""

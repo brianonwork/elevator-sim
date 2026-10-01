@@ -59,7 +59,7 @@ class TestNextHeading:
         # reverse and carry the seated rider away from floor 9. Deleting rule 1 flips this
         # to DOWN, which is the whole point of the rule.
         assert next_heading(
-            car(5, IDLE, riders=[req("r", 1, 9)], pickups=[req("p", 4, 1)])
+            car(5, IDLE, riders=[req("r", 1, 9)], pickups=[req("p", 4, 1)]), now=0
         ) is UP
 
     def test_a_loaded_car_with_nothing_ahead_reverses_instead_of_freezing(self):
@@ -68,45 +68,45 @@ class TestNextHeading:
         # re-committing UP every tick -- boarding() makes this unreachable through the engine,
         # but the controller should not depend on that to terminate.
         c = car(5, UP, capacity=2, riders=[req("r", 5, 2)])
-        assert next_heading(c) is DOWN
+        assert next_heading(c, now=0) is DOWN
         assert plan_car(c, 0)[2] == 2
         assert simulate(c, now=0, stop_time=0) == {"r": 3}
 
     def test_rule2_stop_ahead_keeps_heading(self):
-        assert next_heading(car(5, UP, pickups=[req("p", 8, 1)])) is UP
+        assert next_heading(car(5, UP, pickups=[req("p", 8, 1)]), now=0) is UP
 
     def test_rule3_pickup_here_in_heading_extends_the_sweep(self):
         # Nothing above 7, a stop behind at 4, but d wants to go up from here: keep going up.
-        assert next_heading(car(7, UP, pickups=[req("c", 4, 1), req("d", 7, 9)])) is UP
+        assert next_heading(car(7, UP, pickups=[req("c", 4, 1), req("d", 7, 9)]), now=0) is UP
 
     def test_rule4_stops_only_behind_reverse(self):
-        assert next_heading(car(5, UP, pickups=[req("p", 3, 1)])) is DOWN
+        assert next_heading(car(5, UP, pickups=[req("p", 3, 1)]), now=0) is DOWN
 
     def test_rule4_opposite_pickup_here_does_not_stop_the_reversal(self):
-        assert next_heading(car(7, UP, pickups=[req("c", 4, 1), req("d", 7, 2)])) is DOWN
+        assert next_heading(car(7, UP, pickups=[req("c", 4, 1), req("d", 7, 2)]), now=0) is DOWN
 
     def test_rule5_idle_heading_takes_nearest_stop_lower_on_ties(self):
-        assert next_heading(car(5, IDLE, pickups=[req("u", 7, 9), req("d", 3, 1)])) is DOWN
-        assert next_heading(car(5, IDLE, pickups=[req("u", 6, 9), req("d", 3, 1)])) is UP
+        assert next_heading(car(5, IDLE, pickups=[req("u", 7, 9), req("d", 3, 1)]), now=0) is DOWN
+        assert next_heading(car(5, IDLE, pickups=[req("u", 6, 9), req("d", 3, 1)]), now=0) is UP
 
     def test_rule6_nothing_elsewhere_follows_earliest_pickup_here(self):
-        assert next_heading(car(5, UP, pickups=[req("d", 5, 2), req("u", 5, 8)])) is DOWN
+        assert next_heading(car(5, UP, pickups=[req("d", 5, 2), req("u", 5, 8)]), now=0) is DOWN
 
     def test_rule7_nothing_at_all_is_idle(self):
-        assert next_heading(car(5, UP)) is IDLE
+        assert next_heading(car(5, UP), now=0) is IDLE
 
 
 class TestBoarding:
     def test_filters_by_floor_and_direction(self):
         c = car(5, pickups=[req("u", 5, 8), req("d", 5, 2), req("x", 7, 1)])
-        assert [p.id for p in boarding(c, UP)] == ["u"]
+        assert [p.id for p in boarding(c, UP, now=0)] == ["u"]
 
     def test_caps_at_free_capacity_in_assignment_order(self):
         c = car(5, capacity=2, riders=[req("r", 1, 9)], pickups=[req("a", 5, 7), req("b", 5, 8)])
-        assert [p.id for p in boarding(c, UP)] == ["a"]
+        assert [p.id for p in boarding(c, UP, now=0)] == ["a"]
 
     def test_idle_boards_nobody(self):
-        assert boarding(car(5, pickups=[req("u", 5, 8)]), IDLE) == []
+        assert boarding(car(5, pickups=[req("u", 5, 8)]), IDLE, now=0) == []
 
 
 class TestStarvedRiderKeepsASeat:
@@ -139,6 +139,15 @@ class TestStarvedRiderKeepsASeat:
         c = self.two_seat_car(100)
         c.capacity = 1
         assert boarding(c, UP, now=100) == []
+
+    def test_the_tick_must_be_given_so_the_rule_cannot_be_switched_off_by_omission(self):
+        # With a default of 0 this car, at tick 5,000, would offer both seats and ignore "s".
+        c = self.two_seat_car(100)
+        with pytest.raises(TypeError):
+            boarding(c, UP)
+        with pytest.raises(TypeError):
+            next_heading(c)
+        assert [p.id for p in boarding(c, UP, now=5_000)] == ["a"]
 
     def test_a_one_seat_car_turns_back_for_the_starved_rider_instead_of_freezing(self):
         # Heading UP on floor 5 with nothing above, "s" starved below and "a" here going up.

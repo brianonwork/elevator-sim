@@ -5,6 +5,7 @@ from conftest import IdleScheduler
 
 from elevator_sim.algorithms import BUILTINS, available
 from elevator_sim.cli import main
+from elevator_sim.scheduler import ReplayError
 
 
 def run_cli(tmp_path, *flags, elevators="2", floors="60"):
@@ -72,13 +73,25 @@ def test_stalled_run_exits_1(tmp_path, capsys, monkeypatch):
 
 def test_a_replay_that_does_not_terminate_exits_1(tmp_path, capsys, monkeypatch):
     # The default scheduler predicts drop-offs by replaying the controller; a controller bug
-    # shows up there first, as a RuntimeError, before the engine's own stall guard.
+    # shows up there first, as a ReplayError, before the engine's own stall guard.
     def never_ends(*args, **kwargs):
-        raise RuntimeError("controller replay did not terminate")
+        raise ReplayError("controller replay did not terminate")
 
     monkeypatch.setattr("elevator_sim.algorithms.policies.simulate", never_ends)
     assert run_cli(tmp_path) == 1
     assert capsys.readouterr().err == "elevator-sim: controller replay did not terminate\n"
+
+
+def test_an_unrelated_runtime_error_is_not_dressed_up_as_a_user_error(tmp_path, monkeypatch):
+    # Only the replay's own guard is an expected failure; any other RuntimeError is a bug
+    # and must keep its traceback.
+    class Broken:
+        def step(self, state):
+            raise RuntimeError("dictionary changed size during iteration")
+
+    monkeypatch.setitem(BUILTINS, "broken", lambda cfg: Broken())
+    with pytest.raises(RuntimeError, match="dictionary changed size"):
+        run_cli(tmp_path, "--scheduler", "broken")
 
 
 # -- fleet configuration flags ---------------------------------------------------------

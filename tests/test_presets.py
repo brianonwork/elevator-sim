@@ -103,3 +103,19 @@ class TestExperimentVariants:
         assert (plain.stop_time, stop1.stop_time, stop3.stop_time) == (0, 1, 3)
         assert (plain.num_elevators, plain.num_floors, plain.capacity) == (4, 60, 8)
         assert not hasattr(plain, "served_floors")
+
+
+def test_seeds_are_pinned_and_do_not_depend_on_where_a_building_sits_in_the_list(monkeypatch):
+    # runs.csv is keyed by these seeds, so they must survive a building being added or moved.
+    from elevator_sim.trials import presets
+
+    expected = {
+        (p.number, b.name): [p.number * 10_000 + block * 100 + i for i in range(10)]
+        for p in presets.PRESETS
+        for block, b in enumerate(presets.BUILDINGS)
+    }
+    assert expected[(2, "B1")][0] == 20_000 and expected[(8, "B7")][9] == 80_609
+    monkeypatch.setattr(presets, "BUILDINGS", tuple(reversed(presets.BUILDINGS)))
+    for p in presets.PRESETS:
+        for b in presets.BUILDINGS:
+            assert p.seeds(b) == expected[(p.number, b.name)]

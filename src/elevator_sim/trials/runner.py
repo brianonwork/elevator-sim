@@ -30,6 +30,7 @@ comparison** -- scheduler A and scheduler B are compared seed by seed on the sam
 
 from __future__ import annotations
 
+import ast
 import csv
 import hashlib
 import os
@@ -314,35 +315,78 @@ def stale_cells(path: Path = RESULTS) -> list[str]:
     return stale
 
 
-def fingerprinted_files() -> list[Path]:
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+"""The ``elevator_sim`` package directory, whose source the fingerprint covers."""
+
+
+def fingerprinted_files(root: Path = PACKAGE_ROOT) -> list[Path]:
     """Return the source files whose contents decide a results row.
 
+    Args:
+        root: The package directory to look under.
+
     Returns:
-        Every ``.py`` file of the package except ``UNHASHED``, as sorted paths relative to
-        the package root.
+        Every ``.py`` file under ``root`` except ``UNHASHED``, as sorted paths relative to
+        ``root``.
     """
-    root = Path(__file__).resolve().parent.parent
     files = (p.relative_to(root) for p in root.rglob("*.py"))
     return sorted(p for p in files if p.as_posix() not in UNHASHED)
 
 
-def source_fingerprint() -> str:
-    """Return a hash of the simulator, scheduler and trial-design source.
+class _DropStrings(ast.NodeTransformer):
+    """Remove every statement that is only a string: docstrings and attribute docstrings."""
+
+    def visit_Expr(self, node: ast.Expr) -> ast.Expr | None:  # noqa: N802
+        """Drop a bare string statement and keep any other expression statement.
+
+        Args:
+            node: The expression statement being visited.
+
+        Returns:
+            ``None`` (remove it) for a bare string, else ``node`` unchanged.
+        """
+        value = node.value
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            return None
+        return node
+
+
+def code_of(source: str) -> str:
+    """Return a text form of a module's code that ignores everything but the code.
+
+    Parsing discards comments, blank lines, spacing and line endings; the bare string
+    statements are dropped as well. What is left changes only when the program does.
+
+    Args:
+        source: The module's source text.
+
+    Returns:
+        ``ast.dump`` of the parsed module without its docstrings.
+    """
+    return ast.dump(_DropStrings().visit(ast.parse(source)))
+
+
+def source_fingerprint(root: Path = PACKAGE_ROOT) -> str:
+    """Return a hash of the simulator, scheduler and trial-design code.
 
     ``done_cells`` keys on a cell's identity alone, so after an edit to the controller, a
     policy or a preset every old row still reads as finished and ``run`` would write
     nothing. Nothing in a row says which code produced it; this does, for the whole file.
-    It is deliberately coarse: a comment edit changes it too, and the cost of that is one
-    warning, where the cost of missing a real change is a report built on stale numbers.
+    Only code counts (:func:`code_of`): a reworded docstring, a comment or a checkout with
+    different line endings leaves it alone, so the warning it feeds stays rare enough to be
+    read. It still cannot tell a refactor from a change that moves results. The text form
+    is Python's own, so compare stamps made by the same Python version (3.12 is pinned).
+
+    Args:
+        root: The package directory to hash.
 
     Returns:
-        A SHA-256 hex digest over each file's relative path and bytes.
+        A SHA-256 hex digest over each file's relative path and code.
     """
-    root = Path(__file__).resolve().parent.parent
     digest = hashlib.sha256()
-    for relative in fingerprinted_files():
+    for relative in fingerprinted_files(root):
         digest.update(relative.as_posix().encode())
-        digest.update((root / relative).read_bytes())
+        digest.update(code_of((root / relative).read_text(encoding="utf-8")).encode())
     return digest.hexdigest()
 
 

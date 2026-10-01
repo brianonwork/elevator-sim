@@ -139,13 +139,15 @@ def test_a_draining_burst_leaves_no_rider_waiting_past_a_few_round_trips(name, s
     controller's starved-rider seat, tested in ``test_starvation.py`` and, with one-seat
     cars, by every other invariant in this file.
     """
-    if config.capacity == 1:
-        pytest.skip("the 8-round-trip bound assumes four seats; one seat queues far longer")
     round_trip = 2 * config.num_floors
-    result = Simulation(
-        config, BUILTINS[name](config), random_requests(seed)
-    ).run(max_ticks=50_000)
+    requests = random_requests(seed)
+    # Four seats: the 8 round trips argued above. One seat: the burst queues far longer, so
+    # the bound is the worst a working fleet can do -- every rider assigned to one car and
+    # each costing it a whole round trip. The measured worst is about a third of that (790
+    # of 2,400 ticks), and a rider left behind by the starvation rule would be far past it.
+    round_trips = 8 if config.capacity > 1 else len(requests)
+    result = Simulation(config, BUILTINS[name](config), requests).run(max_ticks=50_000)
     worst = max(result.passengers, key=lambda p: p.wait_time)
-    assert worst.wait_time < 8 * round_trip, (
+    assert worst.wait_time < round_trips * round_trip, (
         f"{worst.request.id} waited {worst.wait_time} ticks for a {round_trip}-tick round trip"
     )

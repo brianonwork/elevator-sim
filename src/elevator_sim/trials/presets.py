@@ -53,6 +53,10 @@ class Building:
     """Requests generated per run, for presets bounded by request count."""
     seeds: int
     """Independent runs (random seeds) made per preset on this building."""
+    seed_block: int
+    """This building's own block of 100 seeds within each preset (``Preset.seed_for``).
+    Fixed per building and never reused, so adding or reordering buildings leaves every
+    existing building's request files, and the results keyed by their seeds, unchanged."""
 
     @property
     def nominal_rate(self) -> float:
@@ -73,19 +77,19 @@ class Building:
 
 BUILDINGS = (
     # Reference building; headline numbers. Every building gets 10 seeds.
-    Building("B1", 60, 4, 8, 400, 10),
+    Building("B1", 60, 4, 8, 400, 10, 0),
     # Few cars.
-    Building("B2", 60, 2, 8, 200, 10),
+    Building("B2", 60, 2, 8, 200, 10, 1),
     # Many cars.
-    Building("B3", 60, 8, 8, 800, 10),
+    Building("B3", 60, 8, 8, 800, 10, 2),
     # Short; expect no change from B1.
-    Building("B4", 30, 4, 8, 400, 10),
+    Building("B4", 30, 4, 8, 400, 10, 3),
     # Tall; expect no change from B1.
-    Building("B5", 100, 4, 8, 400, 10),
+    Building("B5", 100, 4, 8, 400, 10, 4),
     # Small cars; stranding frequent.
-    Building("B6", 60, 4, 4, 400, 10),
+    Building("B6", 60, 4, 4, 400, 10, 5),
     # Big cars; stranding rare.
-    Building("B7", 60, 4, 16, 400, 10),
+    Building("B7", 60, 4, 16, 400, 10, 6),
 )
 BY_NAME = {b.name: b for b in BUILDINGS}
 REFERENCE_BUILDING = BUILDINGS[0]
@@ -275,15 +279,15 @@ class Preset:
         assignment differs.
 
         Args:
-            building: The building being run; must be one of ``BUILDINGS``.
+            building: The building being run; its ``seed_block`` picks the seeds.
             index: Which run of this preset on this building, counting from 0.
 
         Returns:
-            ``number * 10_000 + building position * 100 + index``, so no two (preset,
+            ``number * 10_000 + building.seed_block * 100 + index``, so no two (preset,
             building, run) triples collide while there are fewer than 100 buildings and 100
             runs per cell.
         """
-        return self.number * 10_000 + BUILDINGS.index(building) * 100 + index
+        return self.number * 10_000 + building.seed_block * 100 + index
 
     def seeds(self, building: Building) -> list[int]:
         """Return every seed this preset runs on ``building``.

@@ -34,7 +34,8 @@ class TestRunCell:
         assert row["served"] > 100 and row["unserved"] == 0
         assert 0 <= row["wait_min"] <= row["wait_p95"] <= row["wait_max"]
         assert row["total_mean"] >= row["wait_mean"]  # total = wait + travel
-        assert row["seconds"] > 0
+        # CPU time, which a coarse process clock can round to zero on a small cell.
+        assert row["seconds"] >= 0
 
 
     def test_the_overload_cell_stops_arrivals_at_its_horizon_then_drains(self):
@@ -274,6 +275,38 @@ class TestSourceStamp:
         hashed = {p.as_posix() for p in runner.fingerprinted_files()}
         assert "trials/runner.py" in hashed and "algorithms/controller.py" in hashed
         assert not hashed & {"trials/report.py", "trials/cli.py", "cli.py"}
+
+
+class TestFingerprintCountsCodeOnly:
+    """The warning has to be rare to be read, so edits that cannot move a result must not
+    change the fingerprint."""
+
+    CODE = '"""Module docstring."""\n\n\ndef rate(load):\n    """Return it."""\n' \
+           '    # a comment\n    return load * 2\n'
+
+    @staticmethod
+    def of(tmp_path, text, newline="\n"):
+        (tmp_path / "m.py").write_text(text, newline=newline)
+        return runner.source_fingerprint(tmp_path)
+
+    def test_comments_and_docstrings_do_not_count(self, tmp_path):
+        reworded = self.CODE.replace("Return it.", "Return the rate.").replace(
+            "# a comment", "# another comment").replace("Module docstring.", "Reworded.")
+        assert self.of(tmp_path, reworded) == self.of(tmp_path, self.CODE)
+
+    def test_line_endings_and_layout_do_not_count(self, tmp_path):
+        assert self.of(tmp_path, self.CODE, newline="\r\n") == self.of(tmp_path, self.CODE)
+        assert self.of(tmp_path, self.CODE.replace("load * 2", "load  *  2")) == self.of(
+            tmp_path, self.CODE)
+
+    def test_a_change_to_the_code_counts(self, tmp_path):
+        assert self.of(tmp_path, self.CODE.replace("* 2", "* 3")) != self.of(
+            tmp_path, self.CODE)
+
+    def test_a_new_or_renamed_file_counts(self, tmp_path):
+        before = self.of(tmp_path, self.CODE)
+        (tmp_path / "extra.py").write_text("X = 1\n")
+        assert runner.source_fingerprint(tmp_path) != before
 
 
 def test_an_unknown_variant_name_is_a_key_error_naming_the_choices():

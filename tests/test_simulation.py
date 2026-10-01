@@ -392,3 +392,16 @@ def test_until_zero_still_logs_time_zero(naive_scheduler):
     result = Simulation(cfg(), naive_scheduler, [Request(0, "a", 1, 3)]).run(until=0)
     assert result.positions_log == [(0, (1,))]
     assert result.ticks == 1
+
+
+def test_a_rejected_plan_stops_the_simulation_rather_than_leaving_a_tick_half_done():
+    # Tick 0 has been logged and its request released by the time the plan is rejected. A
+    # second step would log tick 0 again, so the engine refuses it instead.
+    sim = Simulation(cfg(), ScriptedScheduler(lambda state: {0: CarAction(board=("ghost",))}),
+                     [Request(0, "a", 1, 3)])
+    with pytest.raises(SchedulingError, match="ghost"):
+        sim.step()
+    with pytest.raises(SchedulingError, match="stopped at tick 0.*ghost"):
+        sim.step()
+    assert [t for t, _ in sim.positions_log] == [0]
+    assert len(sim.passengers) == 1
