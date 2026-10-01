@@ -22,9 +22,9 @@ def done(id, request_time, pickup, dropoff):
 
 def test_summarize_min_max_mean_and_p95():
     passengers = [
-        done("a", 0, 0, 4),   # wait 0, travel 4, total 4
+        done("a", 0, 0, 4),  # wait 0, travel 4, total 4
         done("b", 0, 2, 10),  # wait 2, travel 8, total 10
-        done("c", 5, 12, 13), # wait 7, travel 1, total 8
+        done("c", 5, 12, 13),  # wait 7, travel 1, total 8
     ]
     s = summarize(passengers)
     assert (s.count, s.unserved) == (3, 0)
@@ -42,7 +42,7 @@ def test_distribution_gives_the_five_number_summary_mean_and_sd():
     assert d.iqr == 5
     assert d.mean == 5.5
     # Population sd of 1..10 is sqrt(8.25).
-    assert d.sd == pytest.approx(8.25 ** 0.5)
+    assert d.sd == pytest.approx(8.25**0.5)
 
 
 def test_one_value_has_no_spread():

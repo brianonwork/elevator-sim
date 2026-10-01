@@ -1,6 +1,5 @@
 """Reading results rows into per-preset tables, winners, and the ranking-stability roll-up."""
 
-
 import pytest
 
 from elevator_sim.trials.presets import BUILDINGS, BY_NUMBER, PRESETS
@@ -28,16 +27,25 @@ from elevator_sim.trials.report import (
 )
 from elevator_sim.trials.runner import COLUMNS, SCHEDULERS
 
-BASELINE = BY_NUMBER[1]      # request-bounded
-SKEWED = BY_NUMBER[4]        # request-bounded, used where a second preset is needed
-OVERLOAD = BY_NUMBER[7]      # arrivals tick-bounded, then drained like every other run
+BASELINE = BY_NUMBER[1]  # request-bounded
+SKEWED = BY_NUMBER[4]  # request-bounded, used where a second preset is needed
+OVERLOAD = BY_NUMBER[7]  # arrivals tick-bounded, then drained like every other run
 
 
 def row(preset, building, scheduler, seed=0, variant="plain", **metrics):
     base = dict.fromkeys(COLUMNS, 0)
     base.update(
-        preset=preset.name, building=building, variant=variant, scheduler=scheduler, seed=seed,
-        served=100, unserved=0, total_mean=10.0, total_p95=20, total_max=30, seconds=0.1,
+        preset=preset.name,
+        building=building,
+        variant=variant,
+        scheduler=scheduler,
+        seed=seed,
+        served=100,
+        unserved=0,
+        total_mean=10.0,
+        total_p95=20,
+        total_max=30,
+        seconds=0.1,
     )
     base.update(metrics)
     return base
@@ -53,8 +61,7 @@ class TestValue:
 
 class TestUnevenCells:
     def test_a_cell_whose_arms_share_a_seed_set_is_not_flagged(self):
-        rows = [row(BASELINE, "B1", s, seed=i) for s in ("eta-cost", "nearest-car")
-                for i in (1, 2)]
+        rows = [row(BASELINE, "B1", s, seed=i) for s in ("eta-cost", "nearest-car") for i in (1, 2)]
         assert uneven_cells(rows) == []
 
     def test_a_cell_missing_a_seed_in_one_arm_is_flagged(self):
@@ -64,18 +71,18 @@ class TestUnevenCells:
         assert "baseline" in flagged and "B1" in flagged
 
     def test_a_cell_missing_a_scheduler_entirely_is_flagged(self):
-        rows = [row(BASELINE, "B1", s, seed=i) for s in ("eta-cost", "nearest-car")
-                for i in (1, 2)]
+        rows = [row(BASELINE, "B1", s, seed=i) for s in ("eta-cost", "nearest-car") for i in (1, 2)]
         rows += [row(BASELINE, "B2", "eta-cost", seed=i) for i in (1, 2)]
         [flagged] = uneven_cells(rows)
         assert "B2" in flagged and "nearest-car=0" in flagged
 
 
-
 class TestCellAndWinner:
     def test_a_cell_reports_the_mean_and_spread_across_seeds(self):
-        rows = [row(BASELINE, "B1", "eta-cost", seed=i, total_mean=v)
-                for i, v in enumerate((10.0, 20.0, 30.0))]
+        rows = [
+            row(BASELINE, "B1", "eta-cost", seed=i, total_mean=v)
+            for i, v in enumerate((10.0, 20.0, 30.0))
+        ]
         assert cell(rows) == (20.0, 10.0, 30.0)
 
     def test_a_cell_with_nothing_in_it_is_none(self):
@@ -93,12 +100,18 @@ class TestCellAndWinner:
 
     def test_the_winner_column_lists_the_leader_first(self):
         # Two arms within noise of each other, eta-cost-fair ahead on the mean.
-        rows = [row(BASELINE, "B1", "eta-cost", seed=i, total_mean=v)
-                for i, v in enumerate([10.0, 12.0, 11.0])]
-        rows += [row(BASELINE, "B1", "eta-cost-fair", seed=i, total_mean=v)
-                 for i, v in enumerate([9.0, 13.0, 10.0])]
-        by_seed = {s: seed_values([r for r in rows if r["scheduler"] == s])
-                   for s in ("eta-cost", "eta-cost-fair")}
+        rows = [
+            row(BASELINE, "B1", "eta-cost", seed=i, total_mean=v)
+            for i, v in enumerate([10.0, 12.0, 11.0])
+        ]
+        rows += [
+            row(BASELINE, "B1", "eta-cost-fair", seed=i, total_mean=v)
+            for i, v in enumerate([9.0, 13.0, 10.0])
+        ]
+        by_seed = {
+            s: seed_values([r for r in rows if r["scheduler"] == s])
+            for s in ("eta-cost", "eta-cost-fair")
+        }
         assert leaders(by_seed)[0] == "eta-cost-fair"
 
 
@@ -107,8 +120,9 @@ class TestTables:
         rows = [row(BASELINE, "B1", "eta-cost", seed=i, total_mean=5.0) for i in range(2)]
         rows += [row(BASELINE, "B1", "round-robin", seed=i, total_mean=9.0) for i in range(2)]
         lines = preset_table(rows, BASELINE)
-        assert any(line.startswith("| B1 |") and line.rstrip().endswith("eta-cost |")
-                   for line in lines)
+        assert any(
+            line.startswith("| B1 |") and line.rstrip().endswith("eta-cost |") for line in lines
+        )
 
     def test_a_building_with_no_rows_is_left_out(self):
         rows = [row(BASELINE, "B1", "eta-cost", total_mean=5.0)]
@@ -118,17 +132,22 @@ class TestTables:
         # Big-bang-0 (plain) favours eta-cost; big-bang-1 (stop1) favours round-robin.
         rows = [row(BASELINE, "B1", "eta-cost", seed=i, total_mean=5.0) for i in range(2)]
         rows += [row(BASELINE, "B1", "round-robin", seed=i, total_mean=9.0) for i in range(2)]
-        rows += [row(BASELINE, "B1", "eta-cost", seed=i, variant="stop1", total_mean=9.0)
-                 for i in range(2)]
-        rows += [row(BASELINE, "B1", "round-robin", seed=i, variant="stop1", total_mean=5.0)
-                 for i in range(2)]
+        rows += [
+            row(BASELINE, "B1", "eta-cost", seed=i, variant="stop1", total_mean=9.0)
+            for i in range(2)
+        ]
+        rows += [
+            row(BASELINE, "B1", "round-robin", seed=i, variant="stop1", total_mean=5.0)
+            for i in range(2)
+        ]
         assert preset_table(rows, BASELINE)[2].rstrip().endswith("eta-cost |")
         assert preset_table(rows, BASELINE, "stop1")[2].rstrip().endswith("round-robin |")
 
     def test_the_express_table_is_the_pair_only_not_the_1_tick_run(self):
         express = BY_NUMBER[8]
-        rows = [row(express, "B1", "express", seed=1, variant=v)
-                for v in ("plain", "stop1", "stop3")]
+        rows = [
+            row(express, "B1", "express", seed=1, variant=v) for v in ("plain", "stop1", "stop3")
+        ]
         variants = {line.split("|")[1].strip() for line in express_table(rows)[2:]}
         assert variants == {"plain", "stop3"}
 
@@ -145,6 +164,7 @@ class TestTables:
 
 def test_the_express_headline_variant_is_comparable_across_buildings():
     from elevator_sim.trials.presets import BY_NAME
+
     express = BY_NUMBER[8]
     assert headline_variant(express, BY_NAME["B1"]) == "plain"
     assert headline_variant(express, BY_NAME["B2"]) == "plain"
@@ -155,25 +175,44 @@ class TestPatternPages:
         for preset in (BASELINE, SKEWED, OVERLOAD):
             rows = pattern_rows(preset)
             assert rows[0].answers and rows[0].column == "total_mean"
-            assert [r.column for r in rows] == [
-                "total_mean", "total_p95", "total_max", "wait_mean"]
+            assert [r.column for r in rows] == ["total_mean", "total_p95", "total_max", "wait_mean"]
 
     def test_seed_values_read_a_column(self):
         rows = [row(SKEWED, "B1", "eta-cost", seed=3, total_p95=20)]
         assert column_seed_values(rows, "total_p95") == {3: 20.0}
 
     def test_leaders_prefer_the_lower_number(self):
-        by_seed = {"eta-cost": {s: 10.0 + s % 2 for s in range(10)},
-                   "round-robin": {s: 50.0 + s % 2 for s in range(10)}}
+        by_seed = {
+            "eta-cost": {s: 10.0 + s % 2 for s in range(10)},
+            "round-robin": {s: 50.0 + s % 2 for s in range(10)},
+        }
         assert leaders(by_seed)[0] == "eta-cost"
 
 
 def test_the_express_table_names_the_mean_and_the_worst_seed_separately():
     express = BY_NUMBER[8]
-    rows = [row(express, "B1", "eta-cost", seed=1, variant="plain",
-                total_mean=90.0, total_p95=95, total_max=100),
-            row(express, "B1", "eta-cost", seed=2, variant="plain",
-                total_mean=80.0, total_p95=85, total_max=20)]
+    rows = [
+        row(
+            express,
+            "B1",
+            "eta-cost",
+            seed=1,
+            variant="plain",
+            total_mean=90.0,
+            total_p95=95,
+            total_max=100,
+        ),
+        row(
+            express,
+            "B1",
+            "eta-cost",
+            seed=2,
+            variant="plain",
+            total_mean=80.0,
+            total_p95=85,
+            total_max=20,
+        ),
+    ]
     lines = express_table(rows)
     assert "max total (worst seed)" in lines[0]
     assert "max total (mean)" in lines[0]
@@ -211,10 +250,12 @@ class TestNoiseFloor:
         assert leaders(by_seed) == ["eta-cost", "eta-cost-fair"]
 
     def test_a_tied_pair_is_not_reported_as_a_rank_flip(self):
-        rows = [row(BASELINE, b, s, seed=i, total_mean=m)
-                for b in ("B1", "B2")
-                for s, ms in (("eta-cost", (10.0, 14.0)), ("round-robin", (11.0, 13.0)))
-                for i, m in enumerate(ms)]
+        rows = [
+            row(BASELINE, b, s, seed=i, total_mean=m)
+            for b in ("B1", "B2")
+            for s, ms in (("eta-cost", (10.0, 14.0)), ("round-robin", (11.0, 13.0)))
+            for i, m in enumerate(ms)
+        ]
         line = next(ln for ln in ranking_table(rows) if ln.startswith("| baseline |"))
         assert "**" not in line
 
@@ -247,10 +288,10 @@ class TestNoiseFloor:
 
 
 def test_the_fairness_table_averages_the_per_seed_rows():
-    rows = [{"power": "1.0", "seed": "1", "total_mean": "10.0", "total_p95": "20",
-             "total_max": "30"},
-            {"power": "1.0", "seed": "2", "total_mean": "20.0", "total_p95": "40",
-             "total_max": "50"}]
+    rows = [
+        {"power": "1.0", "seed": "1", "total_mean": "10.0", "total_p95": "20", "total_max": "30"},
+        {"power": "1.0", "seed": "2", "total_mean": "20.0", "total_p95": "40", "total_max": "50"},
+    ]
     [header_row, separator, line] = fairness_table(rows)
     assert line == "| 1.0 | 15.0 | 30.0 | 40.0 | 2 |"
 
@@ -265,8 +306,9 @@ class TestFairnessTradeoff:
         for scheduler, values in (("eta-cost", plain), ("eta-cost-fair", fair)):
             for seed in seeds:
                 average, tail = values(seed)
-                rows.append(row(BASELINE, "B1", scheduler, seed=seed, total_mean=average,
-                                total_p95=tail))
+                rows.append(
+                    row(BASELINE, "B1", scheduler, seed=seed, total_mean=average, total_p95=tail)
+                )
         return group(rows)
 
     def test_a_fair_arm_faster_on_every_seed_is_better_on_the_average(self):
@@ -315,6 +357,7 @@ class TestFairnessTradeoff:
 def write_runs(path, rows):
     """Write synthetic rows as a runs.csv the report can read."""
     import csv
+
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
@@ -332,15 +375,35 @@ def synthetic_runs(with_pair=True):
             for variant in ("plain", "stop1"):
                 for i, scheduler in enumerate(SCHEDULERS):
                     for seed in (1, 2):
-                        rows.append(row(preset, building.name, scheduler, seed=seed,
-                                        variant=variant, total_mean=10.0 + i,
-                                        total_p95=20 + i, total_max=30 + i, wait_mean=5.0 + i))
+                        rows.append(
+                            row(
+                                preset,
+                                building.name,
+                                scheduler,
+                                seed=seed,
+                                variant=variant,
+                                total_mean=10.0 + i,
+                                total_p95=20 + i,
+                                total_max=30 + i,
+                                wait_mean=5.0 + i,
+                            )
+                        )
     if with_pair:
         for i, scheduler in enumerate(SCHEDULERS):
             for seed in (1, 2):
-                rows.append(row(express, "B1", scheduler, seed=seed, variant="stop3",
-                                total_mean=15.0 + i, total_p95=25 + i, total_max=35 + i,
-                                wait_mean=6.0 + i))
+                rows.append(
+                    row(
+                        express,
+                        "B1",
+                        scheduler,
+                        seed=seed,
+                        variant="stop3",
+                        total_mean=15.0 + i,
+                        total_p95=25 + i,
+                        total_max=35 + i,
+                        wait_mean=6.0 + i,
+                    )
+                )
     return rows
 
 
@@ -377,4 +440,3 @@ class TestFigures:
         results = write_runs(tmp_path / "runs.csv", synthetic_runs(with_pair=False))
         made = write_figures(tmp_path / "figures", results)
         assert (tmp_path / "figures" / "stop-time-pair" / "local-plus-express-b1.png") in made
-

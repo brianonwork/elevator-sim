@@ -8,8 +8,8 @@ two on a big fleet, every lobby-to-top-band trip and nothing else.
 Every built-in gives each new request to one car for good (destination dispatch), and every car then
 sweeps up and down, only turning round when nothing is left ahead (LOOK, with the car sticking to
 the direction it chose). A car whose oldest waiting rider has waited ``starve_limit`` ticks keeps a
-seat free for them, which bounds every rider's wait whichever policy assigned them. A **zone** is
-a band of floors a car treats as home, and its **park floor** is where it waits when it has
+seat free for them, so no rider is passed over for good whichever policy assigned them. A **zone**
+is a band of floors a car treats as home, and its **park floor** is where it waits when it has
 nothing to do. An **express car** is one the scheduler only ever sends
 between the lobby and the top third of the building, and the only kind of car it sends there. See
 ``controller.py``, ``policies.py`` and ``dispatch.py`` for the details.
@@ -98,8 +98,7 @@ def build_express(config: BuildingConfig) -> Scheduler:
     """
     if config.num_elevators < 2:
         raise ValueError(
-            f"express needs at least two cars (one express, one local); got "
-            f"{config.num_elevators}"
+            f"express needs at least two cars (one express, one local); got {config.num_elevators}"
         )
     band = express_floors(config.num_floors)
     if len(band) == config.num_floors:
@@ -161,7 +160,19 @@ def create(name: str, config: BuildingConfig) -> Scheduler:
 
 
 __all__ = [
-    "BUILTINS", "DEFAULT_NAME", "DestinationDispatch", "EtaCost", "Express", "RoundRobin",
-    "ZoneBased", "available", "create", "express_car_count", "express_floors",
-    "nearest_car", "nearest_car_eta", "top_band", "zones",
+    "BUILTINS",
+    "DEFAULT_NAME",
+    "DestinationDispatch",
+    "EtaCost",
+    "Express",
+    "RoundRobin",
+    "ZoneBased",
+    "available",
+    "create",
+    "express_car_count",
+    "express_floors",
+    "nearest_car",
+    "nearest_car_eta",
+    "top_band",
+    "zones",
 ]

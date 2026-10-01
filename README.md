@@ -45,7 +45,7 @@ Arguments:
 | `--scheduler NAME` | `eta-cost` | `eta-cost`, `eta-cost-fair`, `express`, `nearest-car`, `nearest-car-eta`, `round-robin`, `zone-based`, or any name you add to `BUILTINS` |
 | `--positions-out PATH` | `positions.csv` | per-tick elevator positions log |
 | `--passengers-out PATH` | `passengers.csv` | per-passenger timing log |
-| `--max-ticks N` | 100000 | abort (exit 1) if the run has not finished by then |
+| `--max-ticks N` | sized from the input | abort (exit 1) if the run has not finished by then; the default allows for the last request's time plus a generous drain per rider |
 
 Seven schedulers are built in, and [the algorithms](docs/write-up/3-algorithms.md) describes each
 one. `eta-cost` is the default. `express` needs at least two cars and three floors.

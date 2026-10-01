@@ -1,4 +1,3 @@
-
 import pytest
 from conftest import SAMPLE_REQUESTS as SAMPLE
 from conftest import IdleScheduler
@@ -10,20 +9,38 @@ from elevator_sim.scheduler import ReplayError
 
 def run_cli(tmp_path, *flags, elevators="2", floors="60"):
     """The CLI on the sample file, with output paths that tests do not read."""
-    return main([
-        str(SAMPLE), "--elevators", elevators, "--floors", floors, *flags,
-        "--positions-out", str(tmp_path / "p.csv"),
-        "--passengers-out", str(tmp_path / "x.csv"),
-    ])
+    return main(
+        [
+            str(SAMPLE),
+            "--elevators",
+            elevators,
+            "--floors",
+            floors,
+            *flags,
+            "--positions-out",
+            str(tmp_path / "p.csv"),
+            "--passengers-out",
+            str(tmp_path / "x.csv"),
+        ]
+    )
 
 
 def test_runs_end_to_end_and_writes_outputs(tmp_path, capsys):
     positions = tmp_path / "pos.csv"
     passengers = tmp_path / "pax.csv"
-    code = main([
-        str(SAMPLE), "--elevators", "2", "--floors", "60",
-        "--positions-out", str(positions), "--passengers-out", str(passengers),
-    ])
+    code = main(
+        [
+            str(SAMPLE),
+            "--elevators",
+            "2",
+            "--floors",
+            "60",
+            "--positions-out",
+            str(positions),
+            "--passengers-out",
+            str(passengers),
+        ]
+    )
     assert code == 0
     assert positions.read_text().splitlines()[0] == "time,elevator_0,elevator_1"
     assert positions.read_text().splitlines()[1] == "0,1,1"
@@ -31,8 +48,11 @@ def test_runs_end_to_end_and_writes_outputs(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "Passengers served: 3" in out
     # The fleet lines: one per car, then the peak queue.
-    rows = {line.split()[0]: line.split()[1:] for line in out.splitlines()
-            if line.startswith("elevator_")}
+    rows = {
+        line.split()[0]: line.split()[1:]
+        for line in out.splitlines()
+        if line.startswith("elevator_")
+    }
     assert rows == {"elevator_0": ["2", "100%"], "elevator_1": ["1", "76%"]}
     assert "Peak waiting: 1 passenger(s) at tick 10" in out
 
@@ -40,8 +60,18 @@ def test_runs_end_to_end_and_writes_outputs(tmp_path, capsys):
 def test_a_duplicate_id_exits_1(tmp_path, capsys):
     path = tmp_path / "dup.csv"
     path.write_text("time,id,source,dest\n0,p,1,2\n1,p,2,3\n")
-    assert main([str(path), "--positions-out", str(tmp_path / "p.csv"),
-                 "--passengers-out", str(tmp_path / "x.csv")]) == 1
+    assert (
+        main(
+            [
+                str(path),
+                "--positions-out",
+                str(tmp_path / "p.csv"),
+                "--passengers-out",
+                str(tmp_path / "x.csv"),
+            ]
+        )
+        == 1
+    )
     assert "'p' appears more than once" in capsys.readouterr().err
 
 
@@ -65,8 +95,19 @@ def test_missing_input_file_exits_1(tmp_path, capsys):
 
 def test_stalled_run_exits_1(tmp_path, capsys, monkeypatch):
     monkeypatch.setitem(BUILTINS, "stuck", lambda cfg: IdleScheduler())
-    code = main([str(SAMPLE), "--floors", "60", "--max-ticks", "50", "--scheduler", "stuck",
-                 "--positions-out", str(tmp_path / "p.csv")])
+    code = main(
+        [
+            str(SAMPLE),
+            "--floors",
+            "60",
+            "--max-ticks",
+            "50",
+            "--scheduler",
+            "stuck",
+            "--positions-out",
+            str(tmp_path / "p.csv"),
+        ]
+    )
     assert code == 1
     assert "50 ticks" in capsys.readouterr().err
 
@@ -100,11 +141,20 @@ def test_an_unrelated_runtime_error_is_not_dressed_up_as_a_user_error(tmp_path, 
 def test_every_fleet_flag_reaches_the_config(tmp_path, monkeypatch):
     """Each flag is checked against a non-default value, so ignoring one fails here."""
     seen = []
-    monkeypatch.setitem(
-        BUILTINS, "spy", lambda cfg: (seen.append(cfg), IdleScheduler())[1]
+    monkeypatch.setitem(BUILTINS, "spy", lambda cfg: (seen.append(cfg), IdleScheduler())[1])
+    code = run_cli(
+        tmp_path,
+        "--capacity",
+        "3",
+        "--stop-time",
+        "3",
+        "--max-ticks",
+        "5",
+        "--scheduler",
+        "spy",
+        elevators="2",
+        floors="60",
     )
-    code = run_cli(tmp_path, "--capacity", "3", "--stop-time", "3",
-                   "--max-ticks", "5", "--scheduler", "spy", elevators="2", floors="60")
     assert code == 1  # the idle scheduler stalls; we only care that the config was built
     [cfg] = seen
     assert (cfg.num_elevators, cfg.num_floors, cfg.capacity, cfg.stop_time) == (2, 60, 3, 3)
@@ -144,17 +194,63 @@ def test_each_builtin_runs_the_sample(tmp_path, capsys, name):
 def test_a_malformed_request_row_exits_1(tmp_path, capsys):
     bad = tmp_path / "bad.csv"
     bad.write_text("time,id,source,dest\n0,p1,1\n")
-    code = main([str(bad), "--positions-out", str(tmp_path / "p.csv"),
-                 "--passengers-out", str(tmp_path / "x.csv")])
+    code = main(
+        [
+            str(bad),
+            "--positions-out",
+            str(tmp_path / "p.csv"),
+            "--passengers-out",
+            str(tmp_path / "x.csv"),
+        ]
+    )
     assert code == 1
     assert "elevator-sim:" in capsys.readouterr().err
 
 
 def test_an_unwritable_output_path_is_a_one_line_error(tmp_path, capsys):
-    code = main([
-        str(SAMPLE), "--elevators", "2", "--floors", "60",
-        "--positions-out", str(tmp_path / "missing" / "p.csv"),
-        "--passengers-out", str(tmp_path / "x.csv"),
-    ])
+    code = main(
+        [
+            str(SAMPLE),
+            "--elevators",
+            "2",
+            "--floors",
+            "60",
+            "--positions-out",
+            str(tmp_path / "missing" / "p.csv"),
+            "--passengers-out",
+            str(tmp_path / "x.csv"),
+        ]
+    )
     assert code == 1
     assert capsys.readouterr().err.startswith("elevator-sim: ")
+
+
+# -- the runaway guard ---------------------------------------------------------------
+
+
+def test_a_request_far_in_the_future_is_served_by_default(tmp_path):
+    # The prompt allows requests that skip ahead; a fixed default cap used to abort this.
+    path = tmp_path / "late.csv"
+    path.write_text("time,id,source,dest\n100000,a,1,5\n")
+    positions = tmp_path / "p.csv"
+    assert (
+        main(
+            [
+                str(path),
+                "--positions-out",
+                str(positions),
+                "--passengers-out",
+                str(tmp_path / "x.csv"),
+            ]
+        )
+        == 0
+    )
+    rows = positions.read_text().splitlines()
+    assert (rows[1], rows[-1]) == ("0,1", "100004,5")
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "ten"])
+def test_a_max_ticks_below_one_is_rejected_by_argparse(value):
+    with pytest.raises(SystemExit) as exc:
+        main([str(SAMPLE), "--max-ticks", value])
+    assert exc.value.code == 2

@@ -61,8 +61,9 @@ class TestBuildingConfig:
     def test_has_no_served_floors(self):
         # Express is a scheduler's rule, not a fleet setting; the engine knows every car
         # may stop anywhere.
-        assert not hasattr(BuildingConfig(num_elevators=2, num_floors=10, capacity=1),
-                           "served_floors")
+        assert not hasattr(
+            BuildingConfig(num_elevators=2, num_floors=10, capacity=1), "served_floors"
+        )
 
 
 class TestPassenger:
@@ -129,4 +130,3 @@ class TestValidateRequests:
         cfg = BuildingConfig(num_elevators=1, num_floors=5, capacity=1)
         with pytest.raises(ValueError, match="dup"):
             validate_requests([Request(0, "dup", 1, 2), Request(1, "dup", 2, 3)], cfg)
-

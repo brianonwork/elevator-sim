@@ -24,8 +24,9 @@ POLICIES = sorted(BUILTINS)
 
 
 def run(requests, policy="eta-cost", elevators=1, floors=10, capacity=8, stop_time=0):
-    config = BuildingConfig(num_elevators=elevators, num_floors=floors, capacity=capacity,
-                            stop_time=stop_time)
+    config = BuildingConfig(
+        num_elevators=elevators, num_floors=floors, capacity=capacity, stop_time=stop_time
+    )
     result = Simulation(config, create(policy, config), requests).run(max_ticks=10_000)
     return {p.request.id: p for p in result.passengers}, result
 
@@ -96,8 +97,13 @@ def test_express_car_owns_the_long_trip_and_the_local_car_the_short_one():
     # Under `express` on 2 cars x 60 floors, car 1 is express (lobby + 41..60). 'top' is a
     # band trip so it is car 1's regardless of cost, and 'local' is car 0's; each car has
     # one rider, so neither delays the other (local boards at t1: car 0 climbs from 1 to 2).
-    by_id, _ = run([Request(0, "local", 2, 5), Request(0, "top", 1, 55)],
-                   policy="express", elevators=2, floors=60, stop_time=1)
+    by_id, _ = run(
+        [Request(0, "local", 2, 5), Request(0, "top", 1, 55)],
+        policy="express",
+        elevators=2,
+        floors=60,
+        stop_time=1,
+    )
     assert timeline(by_id["local"]) == (0, 1, 5)
     assert timeline(by_id["top"]) == (1, 0, 55)
 
@@ -118,8 +124,13 @@ def test_express_rejects_a_building_whose_band_is_every_floor():
 def test_express_cars_and_local_cars_own_disjoint_trips(elevators, floors):
     # Random traffic: every band trip rode an express car (the last one or two), every
     # other trip a local car, and nobody was stranded by the split.
-    by_id, _ = run(random_requests(3, n=120, floors=floors), policy="express",
-                   elevators=elevators, floors=floors, capacity=4)
+    by_id, _ = run(
+        random_requests(3, n=120, floors=floors),
+        policy="express",
+        elevators=elevators,
+        floors=floors,
+        capacity=4,
+    )
     band = express_floors(floors)
     express_cars = set(range(elevators - express_car_count(elevators), elevators))
     assert express_cars == ({2} if elevators == 3 else {6, 7})
@@ -154,9 +165,7 @@ def test_random_burst_is_served_without_reversing_a_loaded_car(policy, seed):
     assert all(p.is_done and p.wait_time >= 0 for p in by_id.values())
     # With free stops a committed car moves one floor per tick toward each rider's floor, so
     # travel time equals floor distance. Any reversal with riders aboard would lengthen it.
-    assert all(
-        p.travel_time == abs(p.request.dest - p.request.source) for p in by_id.values()
-    )
+    assert all(p.travel_time == abs(p.request.dest - p.request.source) for p in by_id.values())
 
 
 @pytest.mark.parametrize("policy", POLICIES)
@@ -170,8 +179,7 @@ def test_random_burst_with_stop_time_is_served_without_reversing_a_loaded_car(po
     positions_by_time = dict(result.positions_log)
     for p in by_id.values():
         floors = [
-            positions_by_time[t][p.elevator_id]
-            for t in range(p.pickup_time, p.dropoff_time + 1)
+            positions_by_time[t][p.elevator_id] for t in range(p.pickup_time, p.dropoff_time + 1)
         ]
         if p.request.dest > p.request.source:
             assert floors == sorted(floors)

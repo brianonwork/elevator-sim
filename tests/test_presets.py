@@ -27,8 +27,11 @@ B1 = BY_NAME["B1"]
 def test_every_preset_generates_valid_traffic_on_every_building(preset, building):
     bound = {"horizon": 200} if preset.horizon else {"count": 40}
     requests = generate(
-        preset.mixture(building), preset.arrival(0.3, 400), building.floors,
-        preset.seeds(building)[0], **bound,
+        preset.mixture(building),
+        preset.arrival(0.3, 400),
+        building.floors,
+        preset.seeds(building)[0],
+        **bound,
     )
     assert requests
     assert all(1 <= r.source <= building.floors for r in requests)
@@ -38,9 +41,9 @@ def test_every_preset_generates_valid_traffic_on_every_building(preset, building
 def test_nominal_throughput_is_one_rider_per_seat_per_round_trip():
     # 4 cars x 8 seats every 120 ticks (60 floors up and back).
     assert B1.nominal_rate == pytest.approx(32 / 120)
-    assert BY_NAME["B2"].nominal_rate == pytest.approx(16 / 120)   # half the cars
-    assert BY_NAME["B4"].nominal_rate == pytest.approx(32 / 60)    # half the height
-    assert BY_NAME["B7"].nominal_rate == pytest.approx(64 / 120)   # double the seats
+    assert BY_NAME["B2"].nominal_rate == pytest.approx(16 / 120)  # half the cars
+    assert BY_NAME["B4"].nominal_rate == pytest.approx(32 / 60)  # half the height
+    assert BY_NAME["B7"].nominal_rate == pytest.approx(64 / 120)  # double the seats
 
 
 def test_the_arrival_rate_is_demand_times_nominal_throughput():
@@ -61,10 +64,18 @@ def test_overload_is_skewed_two_way_traffic_at_a_higher_demand():
     b1 = BY_NAME["B1"]
     assert overload.load > skewed.load and overload.horizon and not skewed.horizon
     skewed_requests = generate(
-        skewed.mixture(b1), skewed.arrival(0.3, 400), b1.floors, seed=0, count=40,
+        skewed.mixture(b1),
+        skewed.arrival(0.3, 400),
+        b1.floors,
+        seed=0,
+        count=40,
     )
     overload_requests = generate(
-        overload.mixture(b1), overload.arrival(0.3, 400), b1.floors, seed=0, count=40,
+        overload.mixture(b1),
+        overload.arrival(0.3, 400),
+        b1.floors,
+        seed=0,
+        count=40,
     )
     assert skewed_requests == overload_requests
 
@@ -78,7 +89,7 @@ def test_anchor_floors_scale_with_the_building():
 
 def test_seeds_are_reproducible_and_never_collide_between_cells():
     baseline, morning = PRESETS[0], PRESETS[1]
-    assert baseline.seeds(B1) == baseline.seeds(B1)      # every scheduler gets this list
+    assert baseline.seeds(B1) == baseline.seeds(B1)  # every scheduler gets this list
     assert len(set(baseline.seeds(B1))) == B1.seeds == 10
     assert not set(baseline.seeds(B1)) & set(morning.seeds(B1))
     assert not set(baseline.seeds(B1)) & set(baseline.seeds(BY_NAME["B2"]))

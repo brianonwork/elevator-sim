@@ -207,6 +207,7 @@ def config_for(building: Building, variant: Variant) -> BuildingConfig:
 
 # -- flows shared between presets ------------------------------------------------------
 
+
 def lobby_up(b: Building) -> Flow:
     """Build the "up" flow: trips from the lobby to any floor above it.
 
@@ -357,68 +358,90 @@ def rate_for(preset: Preset, building: Building) -> float:
 # preset is judged on the same number, the mean total time (``report.JUDGED_ON``).
 PRESETS = (
     Preset(
-        1, "baseline",
+        1,
+        "baseline",
         lambda b: ((1.0, Flow("interfloor", uniform(), uniform())),),
-        steady_arrival, DEMAND,
+        steady_arrival,
+        DEMAND,
         hypothesis="Every scheduler close; establishes the paired per-seed difference "
-                   "others are read against.",
+        "others are read against.",
     ),
     # Arrivals ramp up from zero over the first quarter of the expected span
     # (requests / rate), like a real rush; the ramp makes the real run a little longer.
     Preset(
-        2, "morning-rush",
+        2,
+        "morning-rush",
         lambda b: ((1.0, lobby_up(b)),),
-        lambda rate, span: ramp(rate, round(0.25 * span)), DEMAND,
+        lambda rate, span: ramp(rate, round(0.25 * span)),
+        DEMAND,
         hypothesis="round-robin falls behind: it ignores where the returning cars are.",
     ),
     Preset(
-        3, "evening-rush",
+        3,
+        "evening-rush",
         lambda b: ((1.0, to_lobby(b)),),
-        steady_arrival, DEMAND,
+        steady_arrival,
+        DEMAND,
         hypothesis="Capacity bites descending; spreading riders across cars beats piling on.",
     ),
     Preset(
-        4, "skewed-two-way", two_way, steady_arrival, DEMAND,
+        4,
+        "skewed-two-way",
+        two_way,
+        steady_arrival,
+        DEMAND,
         hypothesis="The fairness knob: eta-cost-fair trades a little mean for a lower p95.",
     ),
     # Four equal flows into and out of the middle floor, from both sides.
     Preset(
-        5, "interior-hub",
+        5,
+        "interior-hub",
         lambda b: (
             (0.25, Flow("to-hub-below", band(1, hub(b.floors) - 1), point(hub(b.floors)))),
             (0.25, Flow("to-hub-above", band(hub(b.floors) + 1, b.floors), point(hub(b.floors)))),
             (0.25, Flow("from-hub-down", point(hub(b.floors)), band(1, hub(b.floors) - 1))),
             (0.25, Flow("from-hub-up", point(hub(b.floors)), band(hub(b.floors) + 1, b.floors))),
         ),
-        steady_arrival, DEMAND,
+        steady_arrival,
+        DEMAND,
         hypothesis="Cars are pulled from both sides; nearest-car over-commits, eta-cost balances.",
     ),
     # Bursts of 20 requests, spaced so the average rate approximately equals ``rate``
     # (the period 20 / rate is rounded to whole ticks).
     Preset(
-        6, "lunch-bursts",
+        6,
+        "lunch-bursts",
         lambda b: ((0.5, lobby_up(b)), (0.5, to_lobby(b))),
-        lambda rate, span: bursts(20, max(1, round(20 / rate))), DEMAND,
+        lambda rate, span: bursts(20, max(1, round(20 / rate))),
+        DEMAND,
         hypothesis="Ten lobby riders a burst exceed one car; is max per window flat or climbing?",
     ),
     # Skewed two-way's traffic at twice the standard demand: deliberately more than the
     # fleet can clear, so arrivals stop at tick 1500 rather than after a request count, and
     # the run drains the backlog that built up.
     Preset(
-        7, "overload", two_way, steady_arrival, OVERLOAD_DEMAND, horizon=1500,
+        7,
+        "overload",
+        two_way,
+        steady_arrival,
+        OVERLOAD_DEMAND,
+        horizon=1500,
         hypothesis="Throughput sets how fast the backlog grows and drains; average trip "
-                   "time, with the drain included, separates them.",
+        "time, with the drain included, separates them.",
     ),
     # Short hops of 1-3 floors mixed with lobby-to-top-band trips the express car can serve.
     Preset(
-        8, "local-plus-express",
+        8,
+        "local-plus-express",
         lambda b: (
             (0.6, Flow("short-hop", uniform(), offset(1, 3))),
             (0.4, Flow("long-haul", point(1), band(*top_band(b.floors)))),
         ),
-        steady_arrival, DEMAND, variants=big_bang_and_stop_time_pair,
+        steady_arrival,
+        DEMAND,
+        variants=big_bang_and_stop_time_pair,
         hypothesis="The express scheduler lowers mean total time without raising the max, "
-                   "and only once stops cost time.",
+        "and only once stops cost time.",
     ),
 )
 BY_NUMBER = {p.number: p for p in PRESETS}
@@ -446,7 +469,10 @@ def traffic_for(
     """
     span = preset.span(building, rate)
     requests = generate(
-        preset.mixture(building), preset.arrival(rate, span), building.floors, seed,
+        preset.mixture(building),
+        preset.arrival(rate, span),
+        building.floors,
+        seed,
         **preset.bound(building),
     )
     return requests, span

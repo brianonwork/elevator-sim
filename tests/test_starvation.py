@@ -35,9 +35,7 @@ def test_without_the_rule_one_car_starves_the_rider_whatever_the_policy(policy, 
 
 @pytest.mark.parametrize("policy", sorted(BUILTINS))
 @pytest.mark.parametrize("elevators", [1, 2])
-def test_every_scheduler_boards_the_rider_within_the_limit_plus_a_few_sweeps(
-    policy, elevators
-):
+def test_every_scheduler_boards_the_rider_within_the_limit_plus_a_few_sweeps(policy, elevators):
     if policy == "express" and elevators == 1:
         pytest.skip("express needs two cars; its local car carries every trip here")
     wait, config = victim_wait(policy, elevators)

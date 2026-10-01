@@ -7,7 +7,7 @@ rule the cars then follow: keep going one way while there are stops ahead, then 
 
 The policy chooses the car. The controller (``controller.py``) decides what each car does,
 including keeping a seat for a rider who has waited ``starve_limit`` ticks, which is what
-bounds every wait even though no request is ever reassigned.
+ends every wait even though no request is ever reassigned.
 This class owns the only per-car state: each car's assigned pickups and committed heading.
 (``RoundRobin`` also remembers its last pick, but that is policy state, not per-car.)
 """
@@ -72,9 +72,14 @@ class DestinationDispatch:
         # Same threshold the policies' replays use, so their ETAs predict this car.
         starve_after = starve_limit(state.config)
         for view in state.elevators:
-            car = from_view(view, self.heading[view.id], self.assigned[view.id], state.time,
-                            park=None if self.park is None else self.park(view.id),
-                            starve_after=starve_after)
+            car = from_view(
+                view,
+                self.heading[view.id],
+                self.assigned[view.id],
+                state.time,
+                park=None if self.park is None else self.park(view.id),
+                starve_after=starve_after,
+            )
             heading, boarded, target = plan_car(car, state.time)
             # Remember the heading so next tick's decision can honour the commitment.
             self.heading[view.id] = heading
@@ -82,8 +87,6 @@ class DestinationDispatch:
             # Boarders are no longer pickups for this car.
             if boarded:
                 taken = set(boarded_ids)
-                self.assigned[view.id] = [
-                    r for r in self.assigned[view.id] if r.id not in taken
-                ]
+                self.assigned[view.id] = [r for r in self.assigned[view.id] if r.id not in taken]
             plan[view.id] = CarAction(target=target, board=boarded_ids)
         return plan

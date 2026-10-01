@@ -21,8 +21,18 @@ from dataclasses import dataclass
 from math import sqrt
 from statistics import mean, stdev
 
-_T_CRITICAL_95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
-                  6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228}
+_T_CRITICAL_95 = {
+    1: 12.706,
+    2: 4.303,
+    3: 3.182,
+    4: 2.776,
+    5: 2.571,
+    6: 2.447,
+    7: 2.365,
+    8: 2.306,
+    9: 2.262,
+    10: 2.228,
+}
 """Two-sided 95% Student's t critical value, keyed by degrees of freedom (n - 1).
 
 A fixed multiple of the standard error, such as 2.0, is only close to a 95% interval at

@@ -18,7 +18,8 @@ for next. Terms used below:
   starved, the car **reserves a seat** for them: it boards everyone else only while a seat
   stays free. The riders already aboard get off within one sweep, the car then never fills,
   and LOOK brings it past the rider's floor in the rider's direction within two sweeps. So
-  every wait is bounded, whichever policy assigned the rider.
+  no rider is passed over for good, whichever policy assigned them. The wait itself has no
+  fixed cap: a car serves one starved rider at a time, so it grows with the backlog.
 
 Pure logic over :class:`Car`, a small mutable picture of one car. ``DestinationDispatch``
 builds a ``Car`` from the engine's ``ElevatorView`` each tick; :func:`simulate` steps one
@@ -70,6 +71,7 @@ class Car:
     riders and hold come from the engine's ``ElevatorView`` snapshot, while heading and
     pickups come from the scheduler (``DestinationDispatch``). It is a throwaway working copy.
     """
+
     floor: int
     """Floor the car is on now (1-based)."""
     heading: Direction
@@ -101,13 +103,25 @@ class Car:
         Returns:
             A new ``Car`` with the same field values and its own lists.
         """
-        return Car(self.floor, self.heading, self.capacity, list(self.riders),
-                   list(self.pickups), self.held, self.park, self.starve_after)
+        return Car(
+            self.floor,
+            self.heading,
+            self.capacity,
+            list(self.riders),
+            list(self.pickups),
+            self.held,
+            self.park,
+            self.starve_after,
+        )
 
 
 def from_view(
-    view: ElevatorView, heading: Direction, pickups: Sequence[Request], now: int,
-    park: int | None = None, starve_after: int | None = None,
+    view: ElevatorView,
+    heading: Direction,
+    pickups: Sequence[Request],
+    now: int,
+    park: int | None = None,
+    starve_after: int | None = None,
 ) -> Car:
     """Build the controller's picture of ``view`` with the scheduler's own heading and pickups.
 
@@ -212,8 +226,11 @@ def _ahead(floor: int, heading: Direction, floors: set[int]) -> set[int]:
 
 
 def next_heading(
-    car: Car, pending: set[int] | None = None, here: Sequence[Request] | None = None,
-    *, now: int,
+    car: Car,
+    pending: set[int] | None = None,
+    here: Sequence[Request] | None = None,
+    *,
+    now: int,
 ) -> Direction:
     """Return the direction the car commits to this tick.
 
@@ -282,12 +299,16 @@ def next_heading(
 
 
 def boarding(
-    car: Car, heading: Direction, here: Sequence[Request] | None = None, *, now: int,
+    car: Car,
+    heading: Direction,
+    here: Sequence[Request] | None = None,
+    *,
+    now: int,
 ) -> list[Request]:
     """Return the pickups at this floor travelling in ``heading``, in order, up to free capacity.
 
     While the car's oldest pickup is starved (:func:`overdue`) and not boarding here, one
-    seat is kept empty for them. That is what bounds every wait: see the module docstring.
+    seat is kept empty for them. That is what ends every wait: see the module docstring.
 
     Args:
         car: The car doing the boarding. Not mutated.
@@ -315,7 +336,9 @@ def boarding(
 
 
 def next_target(
-    car: Car, heading: Direction, boarded: Sequence[Request],
+    car: Car,
+    heading: Direction,
+    boarded: Sequence[Request],
     pending: set[int] | None = None,
 ) -> int | None:
     """Return the nearest stop in ``heading`` once ``boarded`` passengers' destinations count.
@@ -364,9 +387,38 @@ def plan_car(car: Car, now: int) -> tuple[Direction, list[Request], int | None]:
     return heading, boarded, next_target(car, heading, boarded, pending)
 
 
+def replay_budget(car: Car, stop_time: int) -> int:
+    """Return a tick allowance that any terminating replay of ``car`` stays well inside.
+
+    The car only ever moves between its own floor and the sources and destinations of its
+    riders and pickups, so one sweep is at most ``span`` ticks. Each rider needs one event
+    (alighting) and each pickup two (boarding, alighting); four sweeps plus a stop per event
+    is far more than the rules take to reach the next one. It is a generous allowance, not
+    a tight bound: its job is to scale with the workload, so a long but finite backlog is
+    never mistaken for a rule that loops.
+
+    Args:
+        car: The car about to be replayed. Not mutated.
+        stop_time: Ticks the car is held after anyone boards or alights.
+
+    Returns:
+        The number of ticks after which a replay of ``car`` is treated as not terminating.
+    """
+    floors = [car.floor]
+    for r in (*car.riders, *car.pickups):
+        floors += (r.source, r.dest)
+    span = max(floors) - min(floors)
+    events = len(car.riders) + 2 * len(car.pickups) + 1
+    return car.held + events * (4 * span + stop_time + 2)
+
+
 def simulate(
-    car: Car, now: int, stop_time: int, max_ticks: int = 100_000,
-    *, boarded_at: dict[str, int] | None = None,
+    car: Car,
+    now: int,
+    stop_time: int,
+    max_ticks: int | None = None,
+    *,
+    boarded_at: dict[str, int] | None = None,
 ) -> dict[str, int]:
     """Replay the controller from tick ``now`` until the car is empty with no pickups.
 
@@ -386,9 +438,9 @@ def simulate(
         car: Starting state. Copied, never mutated.
         now: The tick the replay starts at.
         stop_time: Ticks the car is held after anyone boards or alights.
-        max_ticks: Safety cap on replayed ticks after ``now``; the default of 100,000 is
-            far beyond any realistic run and exists only to turn a controller bug into an
-            error instead of an endless loop.
+        max_ticks: Safety cap on replayed ticks after ``now``, which turns a controller bug
+            into an error instead of an endless loop. ``None`` = sized from the car's own
+            workload (:func:`replay_budget`), so a long backlog is not cut short.
         boarded_at: Optional output dict; when given, each pickup's boarding tick is written
             into it keyed by request id. ``None`` = don't record boarding ticks.
 
@@ -398,6 +450,8 @@ def simulate(
     Raises:
         ReplayError: the replay ran more than ``max_ticks`` ticks without finishing.
     """
+    if max_ticks is None:
+        max_ticks = replay_budget(car, stop_time)
     car = car.copy()
     t = now
     # Absolute tick at which the car may next move.

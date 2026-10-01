@@ -41,8 +41,12 @@ class Policy(Protocol):
     """
 
     def __call__(
-        self, state: SimulationState, assigned: Assignments, headings: Headings,
-        request: Request, candidates: Sequence[ElevatorView] | None = None,
+        self,
+        state: SimulationState,
+        assigned: Assignments,
+        headings: Headings,
+        request: Request,
+        candidates: Sequence[ElevatorView] | None = None,
     ) -> int:
         """Choose the car that will serve ``request``.
 
@@ -86,8 +90,12 @@ class RoundRobin:
         self.last = -1
 
     def __call__(
-        self, state: SimulationState, assigned: Assignments, headings: Headings,
-        request: Request, candidates: Sequence[ElevatorView] | None = None,
+        self,
+        state: SimulationState,
+        assigned: Assignments,
+        headings: Headings,
+        request: Request,
+        candidates: Sequence[ElevatorView] | None = None,
     ) -> int:
         """Return the next car id after self.last, wrapping around.
 
@@ -110,8 +118,11 @@ class RoundRobin:
 
 
 def nearest_car(
-    state: SimulationState, assigned: Assignments, headings: Headings,
-    request: Request, candidates: Sequence[ElevatorView] | None = None,
+    state: SimulationState,
+    assigned: Assignments,
+    headings: Headings,
+    request: Request,
+    candidates: Sequence[ElevatorView] | None = None,
 ) -> int:
     """Return the car closest in floors to the request's source.
 
@@ -144,8 +155,11 @@ def nearest_car(
 
 
 def nearest_car_eta(
-    state: SimulationState, assigned: Assignments, headings: Headings,
-    request: Request, candidates: Sequence[ElevatorView] | None = None,
+    state: SimulationState,
+    assigned: Assignments,
+    headings: Headings,
+    request: Request,
+    candidates: Sequence[ElevatorView] | None = None,
 ) -> int:
     """Return the nearest car measured in ticks: the earliest pickup under the real controller.
 
@@ -169,9 +183,13 @@ def nearest_car_eta(
 
     def key(view: ElevatorView) -> tuple[int, int, int]:
         """Sort key: predicted pickup tick, then committed load, then id."""
-        car = from_view(view, headings.get(view.id, Direction.IDLE),
-                        assigned.get(view.id, ()), state.time,
-                        starve_after=starve_limit(state.config))
+        car = from_view(
+            view,
+            headings.get(view.id, Direction.IDLE),
+            assigned.get(view.id, ()),
+            state.time,
+            starve_after=starve_limit(state.config),
+        )
         # Pretend this car took the request, then replay to see when it would board.
         car.pickups.append(request)
         picks: dict[str, int] = {}
@@ -202,8 +220,12 @@ class EtaCost:
         self.power = power
 
     def __call__(
-        self, state: SimulationState, assigned: Assignments, headings: Headings,
-        request: Request, candidates: Sequence[ElevatorView] | None = None,
+        self,
+        state: SimulationState,
+        assigned: Assignments,
+        headings: Headings,
+        request: Request,
+        candidates: Sequence[ElevatorView] | None = None,
     ) -> int:
         """Return the car id with the smallest marginal cost for this request.
 
@@ -220,9 +242,13 @@ class EtaCost:
 
         def key(view: ElevatorView) -> tuple[float, int, int]:
             """Sort key: marginal cost, then riders aboard, then id."""
-            car = from_view(view, headings.get(view.id, Direction.IDLE),
-                            assigned.get(view.id, ()), state.time,
-                            starve_after=starve_limit(state.config))
+            car = from_view(
+                view,
+                headings.get(view.id, Direction.IDLE),
+                assigned.get(view.id, ()),
+                state.time,
+                starve_after=starve_limit(state.config),
+            )
             return (self.cost(car, request, state.time, state.config.stop_time), view.load, view.id)
 
         return min(choices(state, request, candidates), key=key).id
@@ -320,8 +346,12 @@ class ZoneBased:
         self.load_factor = load_factor
 
     def __call__(
-        self, state: SimulationState, assigned: Assignments, headings: Headings,
-        request: Request, candidates: Sequence[ElevatorView] | None = None,
+        self,
+        state: SimulationState,
+        assigned: Assignments,
+        headings: Headings,
+        request: Request,
+        candidates: Sequence[ElevatorView] | None = None,
     ) -> int:
         """Return the zone car for the source, or fall back to ``inner`` over the candidates.
 
@@ -338,7 +368,8 @@ class ZoneBased:
         zone = zones(state.config.num_elevators, state.config.num_floors)
         # Home cars: the source floor is inside their zone and they are not over-committed.
         home = [
-            car for car in choices(state, request, candidates)
+            car
+            for car in choices(state, request, candidates)
             if zone[car.id][0] <= request.source <= zone[car.id][1]
             and car.load + len(assigned.get(car.id, ())) < self.load_factor * car.capacity
         ]
@@ -391,9 +422,7 @@ class Express:
     never mutates its inputs.
     """
 
-    def __init__(
-        self, inner: Policy, express_cars: frozenset[int], floors: frozenset[int]
-    ) -> None:
+    def __init__(self, inner: Policy, express_cars: frozenset[int], floors: frozenset[int]) -> None:
         """Configure which cars are express and which floors they serve.
 
         Args:
@@ -407,8 +436,12 @@ class Express:
         self.floors = floors
 
     def __call__(
-        self, state: SimulationState, assigned: Assignments, headings: Headings,
-        request: Request, candidates: Sequence[ElevatorView] | None = None,
+        self,
+        state: SimulationState,
+        assigned: Assignments,
+        headings: Headings,
+        request: Request,
+        candidates: Sequence[ElevatorView] | None = None,
     ) -> int:
         """Return ``inner``'s pick, from the side of the fleet that owns this request.
 
@@ -430,7 +463,8 @@ class Express:
         # Keep exactly the side that owns this trip: express cars for a band trip, locals
         # for everything else.
         allowed = [
-            car for car in choices(state, request, candidates)
+            car
+            for car in choices(state, request, candidates)
             if (car.id in self.express_cars) == is_express_trip
         ]
         # Only a caller's narrowing can empty a side; say so rather than let ``inner`` fail

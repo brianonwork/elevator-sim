@@ -71,8 +71,7 @@ MAX_TICKS = 200_000
 everyone is delivered), so this only catches bugs."""
 SERIES_WINDOW = 150
 """Width in ticks of one window in the per-window series (by request time)."""
-SERIES_COLUMNS = ("preset", "building", "variant", "scheduler", "seed",
-                  "window_start", "total_max")
+SERIES_COLUMNS = ("preset", "building", "variant", "scheduler", "seed", "window_start", "total_max")
 """Header of ``runs-windows.csv``: the cell's identity, then one window's start tick and max."""
 
 STAMP = "runs.source-hash"
@@ -82,11 +81,23 @@ UNHASHED = ("cli.py", "trials/cli.py", "trials/report.py")
 cannot change a results row."""
 
 COLUMNS = (
-    "preset", "building", "variant", "scheduler", "seed",
-    "served", "unserved",
-    "wait_min", "wait_max", "wait_mean", "wait_p95",
-    "total_min", "total_max", "total_mean", "total_p95",
-    "span", "seconds",
+    "preset",
+    "building",
+    "variant",
+    "scheduler",
+    "seed",
+    "served",
+    "unserved",
+    "wait_min",
+    "wait_max",
+    "wait_mean",
+    "wait_p95",
+    "total_min",
+    "total_max",
+    "total_mean",
+    "total_p95",
+    "span",
+    "seconds",
 )
 """Header of ``runs.csv``. Times are in ticks; ``seconds`` is the CPU time the simulation took
 (``time.process_time`` in the worker that ran it). Every run drains, so ``unserved`` is always
@@ -164,8 +175,7 @@ def variant_of(preset: Preset, building: Building, name: str) -> Variant:
     by_name = {v.name: v for v in preset.variants(building)}
     if name not in by_name:
         raise KeyError(
-            f"no variant {name!r} for {preset.name} on {building.name}; "
-            f"it has {sorted(by_name)}"
+            f"no variant {name!r} for {preset.name} on {building.name}; it has {sorted(by_name)}"
         )
     return by_name[name]
 
@@ -217,14 +227,20 @@ def run_cell(cell: Cell, *, load: float | None = None) -> dict[str, object]:
     return {
         "_series": [
             {**asdict(cell), "window_start": start, "total_max": value}
-            for start, value in series if value is not None
+            for start, value in series
+            if value is not None
         ],
         **asdict(cell),
-        "served": summary.count, "unserved": summary.unserved,
-        "wait_min": summary.wait.min, "wait_max": summary.wait.max,
-        "wait_mean": round(summary.wait.mean, 3), "wait_p95": summary.wait.p95,
-        "total_min": summary.total.min, "total_max": summary.total.max,
-        "total_mean": round(summary.total.mean, 3), "total_p95": summary.total.p95,
+        "served": summary.count,
+        "unserved": summary.unserved,
+        "wait_min": summary.wait.min,
+        "wait_max": summary.wait.max,
+        "wait_mean": round(summary.wait.mean, 3),
+        "wait_p95": summary.wait.p95,
+        "total_min": summary.total.min,
+        "total_max": summary.total.max,
+        "total_mean": round(summary.total.mean, 3),
+        "total_p95": summary.total.p95,
         "span": span,
         "seconds": round(elapsed, 3),
     }
@@ -467,8 +483,11 @@ def run_all(
     # Resume: a cell is done only once both files hold it.
     have_results = done_cells(path)
     have_series = done_series(series_path)
-    pending = [c for c in (todo if todo is not None else cells())
-               if astuple(c) not in have_results or astuple(c) not in have_series]
+    pending = [
+        c
+        for c in (todo if todo is not None else cells())
+        if astuple(c) not in have_results or astuple(c) not in have_series
+    ]
     if not pending:
         return RunResult(0, 0, [])
 
@@ -499,13 +518,20 @@ def run_all(
             for row in pool.imap_unordered(_work, payloads):
                 # A failed cell is reported and skipped, so it is retried on the next run.
                 if "error" in row:
-                    failure = (f"{row['preset']}/{row['building']}/{row['variant']}"
-                               f"/{row['scheduler']}/{row['seed']}: {row['error']}")
+                    failure = (
+                        f"{row['preset']}/{row['building']}/{row['variant']}"
+                        f"/{row['scheduler']}/{row['seed']}: {row['error']}"
+                    )
                     print(f"  !! {failure}")
                     failures.append(failure)
                     continue
-                cell_key = (row["preset"], row["building"], row["variant"], row["scheduler"],
-                            row["seed"])
+                cell_key = (
+                    row["preset"],
+                    row["building"],
+                    row["variant"],
+                    row["scheduler"],
+                    row["seed"],
+                )
                 series_rows = row.pop("_series", [])
                 # Write only the part this cell is missing, so neither file gets duplicates.
                 if cell_key not in have_series:
@@ -633,11 +659,14 @@ def run_fairness(*, path: Path = FAIRNESS, seeds: int = FAIRNESS_SEEDS) -> int:
                     config, DestinationDispatch(EtaCost(power=power)), requests
                 ).run(max_ticks=MAX_TICKS)
                 summary = summarize(result.passengers)
-                writer.writerow({
-                    "power": power, "seed": seed,
-                    "total_mean": round(summary.total.mean, 3),
-                    "total_p95": summary.total.p95,
-                    "total_max": summary.total.max,
-                })
+                writer.writerow(
+                    {
+                        "power": power,
+                        "seed": seed,
+                        "total_mean": round(summary.total.mean, 3),
+                        "total_p95": summary.total.p95,
+                        "total_max": summary.total.max,
+                    }
+                )
                 written += 1
     return written

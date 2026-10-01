@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
 from .models import BuildingConfig, SimulationState
 
@@ -53,7 +53,6 @@ class CarAction:
     Every id must be waiting, at this floor, and within capacity."""
 
 
-@runtime_checkable
 class Scheduler(Protocol):
     """Anything with a ``step(state)`` method that returns a plan; the scheduler interface.
 

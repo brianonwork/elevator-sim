@@ -19,20 +19,20 @@ the same driving rules, known as LOOK:
 The simulator enforces capacity for every scheduler, and none can see riders who have not asked yet.
 They differ only in which car gets a new rider, and whether they consider how full it is.
 
-### Bounded waits: a seat for a starved rider
+### No rider left behind: a seat for a starved rider
 
 The prompt says no passenger should wait indefinitely, and LOOK alone does not ensure it: a car can
 fill up on floors before a rider's and pass them full on every trip while new riders keep arriving
 there. So once a car's longest-waiting rider has waited six round trips (720 ticks on 60 floors; a
 tick is the time to travel one floor), the car keeps a seat free for them, and every wait ends.
 
-[Follow-ups](6-follow-ups.md) lists two ways to shorten that bound: [breaking direction
+[Follow-ups](6-follow-ups.md) lists two ways to shorten those waits: [breaking direction
 commitment](6-follow-ups.md#break-direction-commitment-for-a-starved-rider) and [reassignment before
 boarding](6-follow-ups.md#reassignment-before-boarding).
 
 ## Round-robin
 
-Cars take turns in number order: 1, 2, 3, 4, then 1 again, regardless of each car's position,
+Cars take turns in number order: 0, 1, 2, 3, then 0 again, regardless of each car's position,
 direction or load.
 
 ## Nearest-car

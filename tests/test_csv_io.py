@@ -88,10 +88,11 @@ def test_write_passenger_log(tmp_path):
 @pytest.mark.parametrize(
     "row,match",
     [
-        ("0,p1,1", "missing value"),          # short row: dest is absent
-        ("0,p1,1,5,99", "extra field"),       # long row: a fifth value with no column
-        ("0,p1,1,not-a-floor", "invalid literal"),
-        ("0,   ,1,5", "missing value"),       # whitespace-only id: not None, but not an id
+        ("0,p1,1", "missing value"),  # short row: dest is absent
+        ("0,p1,1,5,99", "extra field"),  # long row: a fifth value with no column
+        ("0,p1,1,not-a-floor", "invalid integer"),
+        ("0,p1,1_0,5", "invalid integer"),  # int() would read 1_0 as 10
+        ("0,   ,1,5", "missing value"),  # whitespace-only id: not None, but not an id
     ],
 )
 def test_a_malformed_row_raises_value_error_naming_the_row(tmp_path, row, match):
@@ -123,3 +124,11 @@ def test_an_extra_column_is_allowed(tmp_path):
     path = tmp_path / "r.csv"
     path.write_text("time,id,source,dest,flow\n0,p1,1,5,up\n")
     assert [r.id for r in read_requests(path)] == ["p1"]
+
+
+def test_a_repeated_required_column_is_rejected(tmp_path):
+    # DictReader would keep the last "dest" and silently send the rider to floor 5.
+    path = tmp_path / "r.csv"
+    path.write_text("time,id,source,dest,dest\n0,p1,1,2,5\n")
+    with pytest.raises(ValueError, match=r"\['dest'\] appear more than once"):
+        read_requests(path)

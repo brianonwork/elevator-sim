@@ -37,7 +37,6 @@ class TestRunCell:
         # CPU time, which a coarse process clock can round to zero on a small cell.
         assert row["seconds"] >= 0
 
-
     def test_the_overload_cell_stops_arrivals_at_its_horizon_then_drains(self):
         preset = BY_NUMBER[7]
         seed = preset.seeds(B2)[0]
@@ -116,7 +115,8 @@ class TestRunAll:
         assert (result.written, result.series_backfilled) == (0, 1)
         assert path.read_text() == original  # results row untouched, not duplicated
         assert done_series(tmp_path / "runs-windows.csv") == {
-            (cell.preset, cell.building, cell.variant, cell.scheduler, cell.seed)}
+            (cell.preset, cell.building, cell.variant, cell.scheduler, cell.seed)
+        }
 
     def test_a_done_cell_with_series_only_gets_its_results_row(self, tmp_path):
         """The reverse gap: an interrupted run left series rows but no results row."""
@@ -146,7 +146,8 @@ class TestRunAll:
         cell = Cell(preset.name, "B2", "plain", "round-robin", preset.seeds(B2)[0])
         run_all([cell], path=path, jobs=1)
         assert done_cells(path) == {
-            (cell.preset, cell.building, cell.variant, cell.scheduler, cell.seed)}
+            (cell.preset, cell.building, cell.variant, cell.scheduler, cell.seed)
+        }
 
     def test_an_empty_results_file_means_nothing_is_done(self, tmp_path):
         assert done_cells(tmp_path / "nothing.csv") == set()
@@ -166,7 +167,8 @@ class TestRunAll:
         assert run_all([cell], path=path, jobs=1).written == 1
         assert path.read_text().splitlines()[0].startswith("preset,building,variant")
         assert done_cells(path) == {
-            (cell.preset, cell.building, cell.variant, cell.scheduler, cell.seed)}
+            (cell.preset, cell.building, cell.variant, cell.scheduler, cell.seed)
+        }
 
 
 class TestRunFailures:
@@ -219,9 +221,7 @@ class TestStaleCells:
         double_span(path)
         assert stale_cells(path) == [line]
 
-    def test_overload_rows_are_skipped_since_their_span_is_the_horizon_not_the_rate(
-        self, tmp_path
-    ):
+    def test_overload_rows_are_skipped_since_their_span_is_the_horizon_not_the_rate(self, tmp_path):
         preset = BY_NUMBER[7]  # overload: span is always the tick horizon, rate-independent
         path = tmp_path / "runs.csv"
         cell = Cell(preset.name, "B2", "plain", "round-robin", preset.seeds(B2)[0])
@@ -281,8 +281,10 @@ class TestFingerprintCountsCodeOnly:
     """The warning has to be rare to be read, so edits that cannot move a result must not
     change the fingerprint."""
 
-    CODE = '"""Module docstring."""\n\n\ndef rate(load):\n    """Return it."""\n' \
-           '    # a comment\n    return load * 2\n'
+    CODE = (
+        '"""Module docstring."""\n\n\ndef rate(load):\n    """Return it."""\n'
+        "    # a comment\n    return load * 2\n"
+    )
 
     @staticmethod
     def of(tmp_path, text, newline="\n"):
@@ -290,18 +292,21 @@ class TestFingerprintCountsCodeOnly:
         return runner.source_fingerprint(tmp_path)
 
     def test_comments_and_docstrings_do_not_count(self, tmp_path):
-        reworded = self.CODE.replace("Return it.", "Return the rate.").replace(
-            "# a comment", "# another comment").replace("Module docstring.", "Reworded.")
+        reworded = (
+            self.CODE.replace("Return it.", "Return the rate.")
+            .replace("# a comment", "# another comment")
+            .replace("Module docstring.", "Reworded.")
+        )
         assert self.of(tmp_path, reworded) == self.of(tmp_path, self.CODE)
 
     def test_line_endings_and_layout_do_not_count(self, tmp_path):
         assert self.of(tmp_path, self.CODE, newline="\r\n") == self.of(tmp_path, self.CODE)
         assert self.of(tmp_path, self.CODE.replace("load * 2", "load  *  2")) == self.of(
-            tmp_path, self.CODE)
+            tmp_path, self.CODE
+        )
 
     def test_a_change_to_the_code_counts(self, tmp_path):
-        assert self.of(tmp_path, self.CODE.replace("* 2", "* 3")) != self.of(
-            tmp_path, self.CODE)
+        assert self.of(tmp_path, self.CODE.replace("* 2", "* 3")) != self.of(tmp_path, self.CODE)
 
     def test_a_new_or_renamed_file_counts(self, tmp_path):
         before = self.of(tmp_path, self.CODE)

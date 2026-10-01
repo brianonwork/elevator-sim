@@ -101,9 +101,14 @@ def distribution(values: Sequence[int]) -> Distribution:
     if not values:
         raise ValueError("distribution needs a non-empty sequence")
     return Distribution(
-        min=min(values), q1=percentile(values, 25), median=percentile(values, 50),
-        q3=percentile(values, 75), p95=percentile(values, 95), max=max(values),
-        mean=mean(values), sd=pstdev(values),
+        min=min(values),
+        q1=percentile(values, 25),
+        median=percentile(values, 50),
+        q3=percentile(values, 75),
+        p95=percentile(values, 95),
+        max=max(values),
+        mean=mean(values),
+        sd=pstdev(values),
     )
 
 
@@ -146,8 +151,7 @@ def summarize(passengers: Iterable[Passenger]) -> Summary:
         if p.is_done:
             # A finished passenger always has every timestamp, so these are never None.
             assert (
-                p.wait_time is not None and p.travel_time is not None
-                and p.total_time is not None
+                p.wait_time is not None and p.travel_time is not None and p.total_time is not None
             )
             waits.append(p.wait_time)
             travels.append(p.travel_time)
@@ -157,8 +161,11 @@ def summarize(passengers: Iterable[Passenger]) -> Summary:
     if not waits:
         raise ValueError("no completed passengers to summarise")
     return Summary(
-        count=len(waits), unserved=unserved,
-        wait=distribution(waits), travel=distribution(travels), total=distribution(totals),
+        count=len(waits),
+        unserved=unserved,
+        wait=distribution(waits),
+        travel=distribution(travels),
+        total=distribution(totals),
     )
 
 
@@ -185,8 +192,7 @@ def format_summary(s: Summary) -> str:
     for label, d in (("Wait time", s.wait), ("Travel time", s.travel), ("Total time", s.total)):
         cells = [d.min, d.q1, d.median, d.q3, d.p95, d.max]
         lines.append(
-            f"{label:<12}" + "".join(f"{v:>8}" for v in cells)
-            + f"{d.mean:>8.2f}{d.sd:>8.2f}"
+            f"{label:<12}" + "".join(f"{v:>8}" for v in cells) + f"{d.mean:>8.2f}{d.sd:>8.2f}"
         )
     return "\n".join(lines)
 
@@ -253,8 +259,11 @@ def fleet_summary(
         if pool > peak:
             peak, peak_time = pool, t
     return FleetSummary(
-        riders=tuple(riders), moving=tuple(moving), ticks=len(positions_log) - 1,
-        peak_waiting=peak, peak_waiting_time=peak_time,
+        riders=tuple(riders),
+        moving=tuple(moving),
+        ticks=len(positions_log) - 1,
+        peak_waiting=peak,
+        peak_waiting_time=peak_time,
     )
 
 

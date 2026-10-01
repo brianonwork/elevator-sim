@@ -30,15 +30,22 @@ def req(id, source, dest, time=0):
 
 
 def view(id, floor, riders=(), capacity=8, held_until=0):
-    return ElevatorView(id=id, floor=floor, capacity=capacity,
-                        riders=tuple(Rider(r, 0) for r in riders), held_until=held_until)
+    return ElevatorView(
+        id=id,
+        floor=floor,
+        capacity=capacity,
+        riders=tuple(Rider(r, 0) for r in riders),
+        held_until=held_until,
+    )
 
 
 def state(cars, time=0, floors=30, stop_time=0, new=()):
-    config = BuildingConfig(num_elevators=len(cars), num_floors=floors, capacity=8,
-                            stop_time=stop_time)
-    return SimulationState(time=time, config=config, elevators=tuple(cars),
-                           waiting=tuple(new), new=tuple(new))
+    config = BuildingConfig(
+        num_elevators=len(cars), num_floors=floors, capacity=8, stop_time=stop_time
+    )
+    return SimulationState(
+        time=time, config=config, elevators=tuple(cars), waiting=tuple(new), new=tuple(new)
+    )
 
 
 def empty(n):
@@ -131,7 +138,7 @@ class TestEtaCost:
         r, n = req("r", 1, 10), req("n", 5, 2)
         car0 = Car(floor=6, heading=UP, capacity=8, riders=[r])
         car1 = Car(floor=9, heading=IDLE, capacity=8)
-        assert EtaCost(power=1).cost(car0, n, now=0, stop_time=0) == 12   # r unchanged, n total 12
+        assert EtaCost(power=1).cost(car0, n, now=0, stop_time=0) == 12  # r unchanged, n total 12
         assert EtaCost(power=1).cost(car1, n, now=0, stop_time=0) == 7
 
     def test_assigned_pickups_count_in_the_cost(self):
@@ -141,8 +148,12 @@ class TestEtaCost:
         p, n = req("p", 1, 2), req("n", 5, 9)
         s = state([view(0, 4), view(1, 8)])
         assert EtaCost(power=1)(s, {0: [p], 1: []}, idle(2), n) == 1
-        assert EtaCost(power=1).cost(Car(floor=4, heading=IDLE, capacity=8, pickups=[p]),
-                                     n, now=0, stop_time=0) == 15
+        assert (
+            EtaCost(power=1).cost(
+                Car(floor=4, heading=IDLE, capacity=8, pickups=[p]), n, now=0, stop_time=0
+            )
+            == 15
+        )
 
     def test_power_two_protects_the_long_waited_rider(self):
         # Tick 20, stops hold one tick. r (requested t0) is aboard car 0 at 25, bound for 30.
@@ -163,7 +174,7 @@ class TestEtaCost:
         a, b = req("a", 1, 2, time=0), req("b", 1, 3, time=1)
         car = Car(floor=1, heading=UP, capacity=8, pickups=[a, b])
         n = req("n", 10, 12, time=5)
-        assert EtaCost(power=1.5).cost(car, n, now=5, stop_time=0) == 11 ** 1.5
+        assert EtaCost(power=1.5).cost(car, n, now=5, stop_time=0) == 11**1.5
 
     def test_tie_breaks_on_load_then_id(self):
         s = state([view(0, 1, riders=[req("r", 1, 5)]), view(1, 1)])
@@ -174,7 +185,7 @@ class TestCandidates:
     def test_a_narrowed_candidate_list_is_honoured(self):
         s = state([view(0, 1), view(1, 5), view(2, 9)])
         request = req("n", 8, 2)
-        assert nearest_car(s, empty(3), idle(3), request) == 2       # car 2 is nearest
+        assert nearest_car(s, empty(3), idle(3), request) == 2  # car 2 is nearest
         narrowed = [s.elevators[0], s.elevators[1]]
         assert nearest_car(s, empty(3), idle(3), request, narrowed) == 1
 

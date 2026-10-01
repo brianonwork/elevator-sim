@@ -79,6 +79,7 @@ NUMBER_LABELS = {
 """``runs.csv`` column to the title and unit the per-pattern pages label it by, matching the
 names in the trial design's numbers table. Only the columns those pages draw."""
 
+
 def header(*names: str) -> list[str]:
     """Return a markdown header row and its separator, so the two can never disagree.
 
@@ -179,7 +180,9 @@ def group(rows: Sequence[dict]) -> dict[tuple, list[dict]]:
 
 
 def cell_rows(
-    grouped: dict[tuple, list[dict]], preset: Preset, building: Building,
+    grouped: dict[tuple, list[dict]],
+    preset: Preset,
+    building: Building,
     variant: str | None = None,
 ) -> dict[str, list[dict]]:
     """Return each scheduler's rows for this preset and building, in one experiment.
@@ -381,9 +384,7 @@ def ranking_table(rows: Sequence[dict], variant: str | None = None) -> list[str]
             winners.append(leaders(by_seed))
         # Compare every building's tie set with B1's (winners[0], the reference building).
         marked = [
-            "-" if not w else (
-                ", ".join(w) if set(w) == set(winners[0]) else f"**{', '.join(w)}**"
-            )
+            "-" if not w else (", ".join(w) if set(w) == set(winners[0]) else f"**{', '.join(w)}**")
             for w in winners
         ]
         lines.append(f"| {preset.name} | {' | '.join(marked)} |")
@@ -406,13 +407,17 @@ def express_table(rows: Sequence[dict]) -> list[str]:
     # Preset 8 is local-plus-express, the only preset with a 3-tick variant (on B1 only).
     preset = BY_NUMBER[8]
     grouped = group(rows)
-    lines = header("Variant", "Scheduler", "mean total", "p95 total (mean)",
-                   "max total (mean)", "max total (worst seed)")
+    lines = header(
+        "Variant",
+        "Scheduler",
+        "mean total",
+        "p95 total (mean)",
+        "max total (mean)",
+        "max total (worst seed)",
+    )
     for variant in STOP_TIME_PAIR:
         for scheduler in SCHEDULERS:
-            cells = grouped.get(
-                (preset.name, REFERENCE_BUILDING.name, variant, scheduler), []
-            )
+            cells = grouped.get((preset.name, REFERENCE_BUILDING.name, variant, scheduler), [])
             if not cells:
                 continue
             means = [float(r["total_mean"]) for r in cells]
@@ -571,8 +576,13 @@ def fairness_tradeoff(grouped: dict[tuple, list[dict]]) -> list[TradeRow]:
         One row per ``(preset, building, variant)`` in sorted order; cells where the two
         arms share fewer than two seeds are left out, since they cannot be tested.
     """
-    cells = sorted({key[:3] for key in grouped
-                    if key[3] == "eta-cost" and (*key[:3], "eta-cost-fair") in grouped})
+    cells = sorted(
+        {
+            key[:3]
+            for key in grouped
+            if key[3] == "eta-cost" and (*key[:3], "eta-cost-fair") in grouped
+        }
+    )
     out = []
     for cell in cells:
         plain, fair = grouped[(*cell, "eta-cost")], grouped[(*cell, "eta-cost-fair")]
@@ -586,18 +596,35 @@ def fairness_tradeoff(grouped: dict[tuple, list[dict]]) -> list[TradeRow]:
             except ValueError:
                 break
             width = diff.half_width()
-            verdict = ("better" if diff.mean > 0 and diff.mean > width
-                       else "worse" if -diff.mean > width else "same")
+            verdict = (
+                "better"
+                if diff.mean > 0 and diff.mean > width
+                else "worse"
+                if -diff.mean > width
+                else "same"
+            )
             # Percent of plain ETA-cost's mean; fair minus plain, so slower is positive.
             scale = 100 / mean(base[s] for s in other if s in base)
             numbers.append((-diff.mean * scale, width * scale, verdict, base == other))
         # A cell with too few shared seeds broke out above and is left out.
         if len(numbers) < 2:
             continue
-        (average, average_width, average_verdict, same_average), \
-            (tail, tail_width, tail_verdict, same_tail) = numbers
-        out.append(TradeRow(*cell, average, average_width, tail, tail_width,
-                            average_verdict, tail_verdict, same_average and same_tail))
+        (
+            (average, average_width, average_verdict, same_average),
+            (tail, tail_width, tail_verdict, same_tail),
+        ) = numbers
+        out.append(
+            TradeRow(
+                *cell,
+                average,
+                average_width,
+                tail,
+                tail_width,
+                average_verdict,
+                tail_verdict,
+                same_average and same_tail,
+            )
+        )
     return out
 
 
@@ -621,7 +648,8 @@ def fairness_tradeoff_table(trades: Sequence[TradeRow]) -> list[str]:
     for t in trades:
         lines.append(
             f"| {t.label} | {t.average:+.2f} ± {t.average_width:.2f} | {t.average_verdict} | "
-            f"{t.tail:+.2f} ± {t.tail_width:.2f} | {t.tail_verdict} |")
+            f"{t.tail:+.2f} ± {t.tail_width:.2f} | {t.tail_verdict} |"
+        )
     return lines
 
 
@@ -692,9 +720,7 @@ def experiment_section(rows: Sequence[dict], experiment: str, variant: str) -> l
     return out
 
 
-def write_report(
-    path: Path = REPORT, results: Path = RESULTS, fairness: Path = FAIRNESS
-) -> Path:
+def write_report(path: Path = REPORT, results: Path = RESULTS, fairness: Path = FAIRNESS) -> Path:
     """Write the markdown report from every experiment's results and, if present, the sweep.
 
     Sections, in order: an introduction on how to read the tables, a warning if any cell
@@ -735,40 +761,59 @@ def write_report(
         "delivered, and every statistic counts every rider in the run.",
         "",
         # Only when some cell has unequal seed sets: a blockquote naming each one.
-        *([
-            "> **Warning.** These cells do not have the same seeds in every arm, so their "
-            "paired comparisons rest on fewer pairs than the rest of the table:",
-            "",
-            *(f"> - {line}" for line in uneven),
-            "",
-        ] if uneven else []),
+        *(
+            [
+                "> **Warning.** These cells do not have the same seeds in every arm, so their "
+                "paired comparisons rest on fewer pairs than the rest of the table:",
+                "",
+                *(f"> - {line}" for line in uneven),
+                "",
+            ]
+            if uneven
+            else []
+        ),
     ]
     # One section per big-bang experiment; the two differ only in what a stop costs.
     for experiment, variant in EXPERIMENTS.items():
         out += experiment_section(rows, experiment, variant)
     # The stop-time pair is preset 8's own experiment, so it gets its own section.
-    out += ["## Stop time and the express scheduler (preset 8 on B1)", "",
-            "The one preset run at two stop times. `express` keeps one car (two on a large "
-            "fleet) on lobby-to-top-band trips and gives those trips to no other car; at stop "
-            "time 0 skipping floors saves nothing, so that split can only cost, and it can "
-            "pay only once stops cost time.", "",
-            *express_table(rows), ""]
+    out += [
+        "## Stop time and the express scheduler (preset 8 on B1)",
+        "",
+        "The one preset run at two stop times. `express` keeps one car (two on a large "
+        "fleet) on lobby-to-top-band trips and gives those trips to no other car; at stop "
+        "time 0 skipping floors saves nothing, so that split can only cost, and it can "
+        "pay only once stops cost time.",
+        "",
+        *express_table(rows),
+        "",
+    ]
     # The trade-off re-reads every experiment's runs: fair against plain ETA-cost per cell.
-    out += ["## Fairness–efficiency trade-off", "",
-            "`eta-cost-fair` against `eta-cost` in every cell both ran, paired per seed. "
-            "A change is fair minus plain as a percentage of plain's value (positive = fair "
-            "slower), with the half-width of its 95% interval; the verdict is the paired "
-            "test's.", "",
-            *fairness_tradeoff_table(fairness_tradeoff(group(rows))), ""]
+    out += [
+        "## Fairness–efficiency trade-off",
+        "",
+        "`eta-cost-fair` against `eta-cost` in every cell both ran, paired per seed. "
+        "A change is fair minus plain as a percentage of plain's value (positive = fair "
+        "slower), with the half-width of its 95% interval; the verdict is the paired "
+        "test's.",
+        "",
+        *fairness_tradeoff_table(fairness_tradeoff(group(rows))),
+        "",
+    ]
     # The fairness sweep is a follow-up command, so its section is optional.
     if fairness.exists():
-        out += ["## Fairness sweep (follow-up)", "",
-                "The cost exponent swept with the environment held at one cell "
-                f"({BY_NUMBER[FAIRNESS_PRESET].name} on B1) -- a single cell and not an "
-                "experiment, run as a follow-up. One run per seed is recorded in "
-                "`exponent_sweep.csv`, so this comparison can be paired per seed like every "
-                "other in this report. Raising `p` should trade mean for max.", "",
-                *fairness_table(fairness_rows(fairness)), ""]
+        out += [
+            "## Fairness sweep (follow-up)",
+            "",
+            "The cost exponent swept with the environment held at one cell "
+            f"({BY_NUMBER[FAIRNESS_PRESET].name} on B1) -- a single cell and not an "
+            "experiment, run as a follow-up. One run per seed is recorded in "
+            "`exponent_sweep.csv`, so this comparison can be paired per seed like every "
+            "other in this report. Raising `p` should trade mean for max.",
+            "",
+            *fairness_table(fairness_rows(fairness)),
+            "",
+        ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(out))
     return path
@@ -778,7 +823,8 @@ TIED = "#2a78d6"
 """Colour of schedulers tied for best on a row's number (one emphasis hue)."""
 DOT_STRIP_LEGEND = (
     "dot = one list; black tick = mean; blue = tied for best on that row's number "
-    "(paired test), grey = separated and worse; log scale shared across each row")
+    "(paired test), grey = separated and worse; log scale shared across each row"
+)
 """Second title line of every dot-strip figure, saying how to read it."""
 SEPARATED = "#8a8880"
 """Colour of schedulers the paired test separates from the leader, as worse: a grey dark
@@ -798,9 +844,13 @@ def plain_number(value: float, _position: object = None) -> str:
     return f"{value:g}"
 
 
-def write_pattern_pages(grouped: dict[tuple, list[dict]], plt, path: Path,
-                        variant: str | None = None, experiment: str = "big-bang-0",
-                        ) -> list[Path]:
+def write_pattern_pages(
+    grouped: dict[tuple, list[dict]],
+    plt,
+    path: Path,
+    variant: str | None = None,
+    experiment: str = "big-bang-0",
+) -> list[Path]:
     """Draw one page per pattern: every list's value, per scheduler, building and number.
 
     Rows are the numbers from ``pattern_rows`` (the judged one first); columns are buildings in
@@ -823,29 +873,49 @@ def write_pattern_pages(grouped: dict[tuple, list[dict]], plt, path: Path,
     made = []
     for preset in PRESETS:
         spec = pattern_rows(preset)
-        fig, axes = plt.subplots(len(spec), len(BUILDINGS), squeeze=False,
-                                 figsize=(2.3 * len(BUILDINGS) + 1.6, 2.2 * len(spec) + 2.0))
+        fig, axes = plt.subplots(
+            len(spec),
+            len(BUILDINGS),
+            squeeze=False,
+            figsize=(2.3 * len(BUILDINGS) + 1.6, 2.2 * len(spec) + 2.0),
+        )
         for i, row in enumerate(spec):
             # Every seed's value for every panel in the row, so the row can share one scale.
             panels = {}
             for b in BUILDINGS:
-                by_seed = {s: column_seed_values(rs, row.column)
-                           for s, rs in cell_rows(grouped, preset, b, variant).items()}
+                by_seed = {
+                    s: column_seed_values(rs, row.column)
+                    for s, rs in cell_rows(grouped, preset, b, variant).items()
+                }
                 panels[b.name] = (by_seed, leaders(by_seed))
-            values = [v for by_seed, _ in panels.values()
-                      for seeds in by_seed.values() for v in seeds.values() if v > 0]
+            values = [
+                v
+                for by_seed, _ in panels.values()
+                for seeds in by_seed.values()
+                for v in seeds.values()
+                if v > 0
+            ]
             for j, b in enumerate(BUILDINGS):
                 ax = axes[i][j]
                 by_seed, tied = panels[b.name]
-                draw_dot_strip(ax, by_seed, tied, values=values, first_column=j == 0,
-                               last_row=i == len(spec) - 1)
+                draw_dot_strip(
+                    ax,
+                    by_seed,
+                    tied,
+                    values=values,
+                    first_column=j == 0,
+                    last_row=i == len(spec) - 1,
+                )
                 if i == 0:
-                    ax.set_title(f"{b.name}: {b.floors} floors, {b.cars} cars, cap {b.capacity}",
-                                 fontsize=8)
+                    ax.set_title(
+                        f"{b.name}: {b.floors} floors, {b.cars} cars, cap {b.capacity}", fontsize=8
+                    )
             label_row(axes[i][0], row)
         title = preset.name.replace("-", " ").capitalize()
-        fig.suptitle(f"{experiment} · {title}: every list, by scheduler and building\n"
-                     f"{DOT_STRIP_LEGEND}", fontsize=9)
+        fig.suptitle(
+            f"{experiment} · {title}: every list, by scheduler and building\n{DOT_STRIP_LEGEND}",
+            fontsize=9,
+        )
         fig.tight_layout()
         made.append(path / f"{preset.name}.png")
         fig.savefig(made[-1], dpi=120)
@@ -853,8 +923,15 @@ def write_pattern_pages(grouped: dict[tuple, list[dict]], plt, path: Path,
     return made
 
 
-def draw_dot_strip(ax, by_seed: dict[str, dict[int, float]], tied: Sequence[str], *,
-                   values: Sequence[float], first_column: bool, last_row: bool) -> None:
+def draw_dot_strip(
+    ax,
+    by_seed: dict[str, dict[int, float]],
+    tied: Sequence[str],
+    *,
+    values: Sequence[float],
+    first_column: bool,
+    last_row: bool,
+) -> None:
     """Draw one dot-strip panel: a dot per list and a tick at the mean, per scheduler.
 
     Shared by the pattern pages and the stop-time pair so every panel reads the same way.
@@ -877,26 +954,29 @@ def draw_dot_strip(ax, by_seed: dict[str, dict[int, float]], tied: Sequence[str]
         # Spread a cell's dots over a thin band (by seed order) so equal values
         # stay countable instead of printing on top of each other.
         offsets = [((n % 5) - 2) * 0.07 for n in range(len(seeds))]
-        ax.scatter([k + o for o in offsets], seeds, s=14, color=colour,
-                   alpha=0.8, linewidths=0, zorder=3)
+        ax.scatter(
+            [k + o for o in offsets], seeds, s=14, color=colour, alpha=0.8, linewidths=0, zorder=3
+        )
         centre = mean(seeds)
-        ax.plot([k - 0.32, k + 0.32], [centre, centre], color="#0b0b0b",
-                linewidth=1.5, zorder=4)
+        ax.plot([k - 0.32, k + 0.32], [centre, centre], color="#0b0b0b", linewidth=1.5, zorder=4)
     ax.set_yscale("log")
     if values:
         ax.set_ylim(min(values) / 1.15, max(values) * 1.15)
     # Plain-number ticks at 1, 2 and 5 of each decade, labelled on the first
     # column only since the whole row shares the scale.
     ax.yaxis.set_major_locator(LogLocator(subs=(1.0, 2.0, 5.0)))
-    ax.yaxis.set_major_formatter(
-        FuncFormatter(plain_number) if first_column else NullFormatter())
+    ax.yaxis.set_major_formatter(FuncFormatter(plain_number) if first_column else NullFormatter())
     ax.yaxis.set_minor_formatter(NullFormatter())
     ax.tick_params(axis="y", labelsize=7)
     ax.set_xlim(-0.5, len(SCHEDULERS) - 0.5)
     # Scheduler names on the bottom row only, rotated so the full names fit.
-    ax.set_xticks(range(len(SCHEDULERS)),
-                  SCHEDULERS if last_row else [""] * len(SCHEDULERS), fontsize=7,
-                  rotation=45 if last_row else 0, ha="right" if last_row else "center")
+    ax.set_xticks(
+        range(len(SCHEDULERS)),
+        SCHEDULERS if last_row else [""] * len(SCHEDULERS),
+        fontsize=7,
+        rotation=45 if last_row else 0,
+        ha="right" if last_row else "center",
+    )
     ax.grid(axis="y", color="#e1e0d9", linewidth=0.6, zorder=0)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
@@ -913,8 +993,7 @@ def label_row(ax, row: PatternRow) -> None:
     ax.set_ylabel(f"{row.label}\n{row.unit}, lower is better{note}", fontsize=8)
 
 
-def write_stop_time_pair(grouped: dict[tuple, list[dict]], plt, path: Path = STOP_TIME_DIR
-                         ) -> Path:
+def write_stop_time_pair(grouped: dict[tuple, list[dict]], plt, path: Path = STOP_TIME_DIR) -> Path:
     """Draw the stop-time pair: preset 8 on B1 at stop time 0 and 3, every list per scheduler.
 
     Same rows and panels as a pattern page, but the columns are the two stop costs on the
@@ -935,33 +1014,45 @@ def write_stop_time_pair(grouped: dict[tuple, list[dict]], plt, path: Path = STO
     # Only the pair's two arms: this cell also carries big-bang-1's 1-tick run.
     variants = [v for v in preset.variants(building) if v.name in STOP_TIME_PAIR]
     spec = pattern_rows(preset)
-    fig, axes = plt.subplots(len(spec), len(variants), squeeze=False,
-                             figsize=(2.3 * len(variants) + 1.6, 2.2 * len(spec) + 2.0))
+    fig, axes = plt.subplots(
+        len(spec),
+        len(variants),
+        squeeze=False,
+        figsize=(2.3 * len(variants) + 1.6, 2.2 * len(spec) + 2.0),
+    )
     for i, row in enumerate(spec):
         # Every seed's value for both arms, so the row shares one scale across the pair.
         panels = {}
         for variant in variants:
             by_seed = {
                 s: column_seed_values(
-                    grouped.get((preset.name, building.name, variant.name, s), []), row.column)
+                    grouped.get((preset.name, building.name, variant.name, s), []), row.column
+                )
                 for s in SCHEDULERS
             }
             panels[variant.name] = (by_seed, leaders(by_seed))
-        values = [v for by_seed, _ in panels.values()
-                  for seeds in by_seed.values() for v in seeds.values() if v > 0]
+        values = [
+            v
+            for by_seed, _ in panels.values()
+            for seeds in by_seed.values()
+            for v in seeds.values()
+            if v > 0
+        ]
         for j, variant in enumerate(variants):
             ax = axes[i][j]
             by_seed, tied = panels[variant.name]
-            draw_dot_strip(ax, by_seed, tied, values=values, first_column=j == 0,
-                           last_row=i == len(spec) - 1)
+            draw_dot_strip(
+                ax, by_seed, tied, values=values, first_column=j == 0, last_row=i == len(spec) - 1
+            )
             if i == 0:
                 ax.set_title(f"Stop cost {variant.stop_time} ticks", fontsize=8)
         label_row(axes[i][0], row)
     # Two columns make a narrow page, so the legend is broken into three lines.
     legend = DOT_STRIP_LEGEND.replace("mean; ", "mean;\n").replace("worse; ", "worse;\n")
     fig.suptitle(
-        f"Local + express on {building.name} at two stop costs: every list, by scheduler\n"
-        f"{legend}", fontsize=9)
+        f"Local + express on {building.name} at two stop costs: every list, by scheduler\n{legend}",
+        fontsize=9,
+    )
     fig.tight_layout()
     out = path / f"{preset.name}-{building.name.lower()}.png"
     fig.savefig(out, dpi=120)
@@ -969,8 +1060,9 @@ def write_stop_time_pair(grouped: dict[tuple, list[dict]], plt, path: Path = STO
     return out
 
 
-def write_fairness_tradeoff(grouped: dict[tuple, list[dict]], plt,
-                            path: Path = FAIRNESS_TRADE_DIR) -> Path:
+def write_fairness_tradeoff(
+    grouped: dict[tuple, list[dict]], plt, path: Path = FAIRNESS_TRADE_DIR
+) -> Path:
     """Draw the trade-off as a bar chart: how many cells had each outcome.
 
     One bar per outcome in ``OUTCOMES``, in plain words, with its count printed at the end.
@@ -992,13 +1084,26 @@ def write_fairness_tradeoff(grouped: dict[tuple, list[dict]], plt,
     fig, ax = plt.subplots(figsize=(8.0, 0.55 * len(shown) + 2.4))
     # First outcome at the top, so the chart reads down like a list.
     rows = range(len(shown))[::-1]
-    ax.barh(list(rows), [counts[o] for o in shown], height=0.6, color=TIED,
-            edgecolor="white", linewidth=2)
+    ax.barh(
+        list(rows),
+        [counts[o] for o in shown],
+        height=0.6,
+        color=TIED,
+        edgecolor="white",
+        linewidth=2,
+    )
     top = max(counts.values(), default=0) or 1
     for y, outcome in zip(rows, shown, strict=True):
         # Counts sit just past the bar's end, so a zero still gets its label.
-        ax.text(counts[outcome] + top * 0.01, y, str(counts[outcome]), va="center",
-                fontsize=10, fontweight="bold", color="#0b0b0b")
+        ax.text(
+            counts[outcome] + top * 0.01,
+            y,
+            str(counts[outcome]),
+            va="center",
+            fontsize=10,
+            fontweight="bold",
+            color="#0b0b0b",
+        )
     ax.set_yticks(list(rows), shown, fontsize=9)
     ax.set_xlim(0, top * 1.1)
     ax.set_xlabel("Number of cases", fontsize=9)
@@ -1010,20 +1115,35 @@ def write_fairness_tradeoff(grouped: dict[tuple, list[dict]], plt,
     # A figure-level title, left-aligned to the figure edge: the long bar labels take the
     # left of the canvas, and an axes title there would run off the right.
     fig.suptitle(
-        "A \"fairer\" elevator scheduler almost never changed the result",
-        fontsize=11, fontweight="bold", x=0.02, ha="left")
+        'A "fairer" elevator scheduler almost never changed the result',
+        fontsize=11,
+        fontweight="bold",
+        x=0.02,
+        ha="left",
+    )
     # The comparison, the test and the terms, so the figure reads without the write-up.
-    fig.text(0.02, 0.915, "\n".join((
-        "Compared: the standard scheduler, which sends each new rider to the car that adds the "
-        "least total trip time,",
-        "and a fair version that does the same but counts long trips extra, to avoid leaving "
-        "anyone waiting very long.",
-        f"Both were run in {len(trades)} cases (building × traffic pattern), on the same 10 "
-        "sets of passenger requests.",
-        "\"Long waits\" = the slowest 5 trips in 100.",
-        "\"No real difference\" = identical results, or a gap too small to tell apart from "
-        "chance.")),
-        fontsize=8.5, va="top", ha="left", color="#3d3d3a", linespacing=1.4)
+    fig.text(
+        0.02,
+        0.915,
+        "\n".join(
+            (
+                "Compared: the standard scheduler, which sends each new rider to the car that adds "
+                "the least total trip time,",
+                "and a fair version that does the same but counts long trips extra, to avoid "
+                "leaving anyone waiting very long.",
+                f"Both were run in {len(trades)} cases (building × traffic pattern), on the same "
+                "10 sets of passenger requests.",
+                '"Long waits" = the slowest 5 trips in 100.',
+                '"No real difference" = identical results, or a gap too small to tell apart from '
+                "chance.",
+            )
+        ),
+        fontsize=8.5,
+        va="top",
+        ha="left",
+        color="#3d3d3a",
+        linespacing=1.4,
+    )
     # Leave the top of the canvas to the title and the five explanation lines.
     fig.tight_layout(rect=(0, 0, 1, 0.77))
     out = path / "trade-off.png"
@@ -1032,8 +1152,13 @@ def write_fairness_tradeoff(grouped: dict[tuple, list[dict]], plt,
     return out
 
 
-def write_overview(grouped: dict[tuple, list[dict]], plt, path: Path,
-                   variant: str | None = None, experiment: str = "big-bang-0") -> Path:
+def write_overview(
+    grouped: dict[tuple, list[dict]],
+    plt,
+    path: Path,
+    variant: str | None = None,
+    experiment: str = "big-bang-0",
+) -> Path:
     """Draw the one-glance overview: who is tied for best, per pattern and building.
 
     The same tie sets as ``ranking_table``, on the judged number. The leader is bold; a cell
@@ -1055,25 +1180,44 @@ def write_overview(grouped: dict[tuple, list[dict]], plt, path: Path,
     ax.set_ylim(len(PRESETS) - 0.5, -0.9)
     ax.axis("off")
     for j, b in enumerate(BUILDINGS):
-        ax.text(j, -0.75, f"{b.name}\n{b.floors} fl, {b.cars} cars, cap {b.capacity}",
-                ha="center", va="center", fontsize=8)
+        ax.text(
+            j,
+            -0.75,
+            f"{b.name}\n{b.floors} fl, {b.cars} cars, cap {b.capacity}",
+            ha="center",
+            va="center",
+            fontsize=8,
+        )
     for i, preset in enumerate(PRESETS):
         ax.text(-0.55, i, preset.name, ha="right", va="center", fontsize=8)
-        sets = [leaders({s: seed_values(rs)
-                         for s, rs in cell_rows(grouped, preset, b, variant).items()})
-                for b in BUILDINGS]
+        sets = [
+            leaders(
+                {s: seed_values(rs) for s, rs in cell_rows(grouped, preset, b, variant).items()}
+            )
+            for b in BUILDINGS
+        ]
         for j, tied in enumerate(sets):
             # Shade a cell whose tie set is not B1's (sets[0]), as the ranking table bolds it.
             if j and set(tied) != set(sets[0]):
-                ax.add_patch(plt.Rectangle((j - 0.48, i - 0.46), 0.96, 0.92,
-                                           color="#eef4fc", zorder=0))
+                ax.add_patch(
+                    plt.Rectangle((j - 0.48, i - 0.46), 0.96, 0.92, color="#eef4fc", zorder=0)
+                )
             for k, name in enumerate(tied):
-                ax.text(j, i - 0.36 + k * 0.15, name, ha="center", va="center", fontsize=7,
-                        fontweight="bold" if k == 0 else "normal")
+                ax.text(
+                    j,
+                    i - 0.36 + k * 0.15,
+                    name,
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    fontweight="bold" if k == 0 else "normal",
+                )
     ax.set_title(
         f"{experiment}: which scheduler works, per pattern and building\n"
         "schedulers tied for best on mean total time (paired test); "
-        "leader in bold; shaded = tie set differs from B1's", fontsize=9)
+        "leader in bold; shaded = tie set differs from B1's",
+        fontsize=9,
+    )
     fig.tight_layout()
     out = path / "best-schedulers.png"
     fig.savefig(out, dpi=120)
@@ -1107,6 +1251,7 @@ def write_figures(path: Path = FIGURES, results: Path = RESULTS) -> list[Path]:
     # file-only backend, so no display is needed.
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:

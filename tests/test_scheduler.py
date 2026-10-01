@@ -14,6 +14,7 @@ def test_car_action_defaults_to_stay_and_board_nobody():
 
 def test_public_api_creates_a_scheduler_without_importing_the_subpackage():
     import elevator_sim
+
     config = BuildingConfig(num_elevators=2, num_floors=10, capacity=4)
     assert "eta-cost" in elevator_sim.available()
     assert elevator_sim.create("eta-cost", config) is not None
@@ -21,6 +22,7 @@ def test_public_api_creates_a_scheduler_without_importing_the_subpackage():
 
 def test_unknown_scheduler_names_the_available_ones():
     import elevator_sim
+
     config = BuildingConfig(num_elevators=1, num_floors=5, capacity=2)
     with pytest.raises(KeyError, match="eta-cost"):
         elevator_sim.create("nope", config)
@@ -32,6 +34,13 @@ def test_available_is_sorted(monkeypatch):
     monkeypatch.setitem(BUILTINS, "zzz-last", lambda cfg: IdleScheduler())
     monkeypatch.setitem(BUILTINS, "-first", lambda cfg: IdleScheduler())
     assert available() == [
-        "-first", "eta-cost", "eta-cost-fair", "express", "nearest-car", "nearest-car-eta",
-        "round-robin", "zone-based", "zzz-last",
+        "-first",
+        "eta-cost",
+        "eta-cost-fair",
+        "express",
+        "nearest-car",
+        "nearest-car-eta",
+        "round-robin",
+        "zone-based",
+        "zzz-last",
     ]

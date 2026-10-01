@@ -200,7 +200,8 @@ def test_empty_plan_leaves_every_car_idle_and_nobody_boards():
 
 def test_scheduler_boards_a_subset_and_the_rest_keep_waiting():
     sim = Simulation(
-        cfg(), ScriptedScheduler(lambda s: {0: CarAction(board=("b",))}),
+        cfg(),
+        ScriptedScheduler(lambda s: {0: CarAction(board=("b",))}),
         [Request(0, "a", 1, 3), Request(0, "b", 1, 4)],
     )
     sim.step()
@@ -287,8 +288,7 @@ def test_same_passenger_in_two_cars_raises():
 def test_a_rejected_plan_boards_nobody():
     sim = Simulation(
         cfg(elevators=2, floors=5),
-        ScriptedScheduler(lambda s: {0: CarAction(board=("a",)),
-                                     1: CarAction(board=("ghost",))}),
+        ScriptedScheduler(lambda s: {0: CarAction(board=("a",)), 1: CarAction(board=("ghost",))}),
         [Request(0, "a", 1, 4)],
     )
     with pytest.raises(SchedulingError, match="ghost"):
@@ -351,7 +351,8 @@ def test_stop_time_holds_the_car_after_alighting():
         return {0: CarAction(target=5, board=board)}
 
     sim = Simulation(
-        cfg(stop_time=1), ScriptedScheduler(plan),
+        cfg(stop_time=1),
+        ScriptedScheduler(plan),
         [Request(0, "a", 1, 3), Request(0, "b", 1, 5)],
     )
     result = sim.run()
@@ -397,8 +398,11 @@ def test_until_zero_still_logs_time_zero(naive_scheduler):
 def test_a_rejected_plan_stops_the_simulation_rather_than_leaving_a_tick_half_done():
     # Tick 0 has been logged and its request released by the time the plan is rejected. A
     # second step would log tick 0 again, so the engine refuses it instead.
-    sim = Simulation(cfg(), ScriptedScheduler(lambda state: {0: CarAction(board=("ghost",))}),
-                     [Request(0, "a", 1, 3)])
+    sim = Simulation(
+        cfg(),
+        ScriptedScheduler(lambda state: {0: CarAction(board=("ghost",))}),
+        [Request(0, "a", 1, 3)],
+    )
     with pytest.raises(SchedulingError, match="ghost"):
         sim.step()
     with pytest.raises(SchedulingError, match="stopped at tick 0.*ghost"):

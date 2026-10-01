@@ -32,8 +32,8 @@ sweep before turning back, so a rider travelling against it waits whichever car 
 fairness power trims only about 1.3 ticks off the longest trip pooled over big-bang-0's 560 paired
 runs, about 1%, because it changes which car is chosen while the problem lies in how cars drive.
 Letting a car reverse for a rider who has waited past a threshold could be tested on the existing
-patterns. Waits are already bounded by the [seat
-rule](3-algorithms.md#bounded-waits-a-seat-for-a-starved-rider); this would shorten the long ones.
+patterns. The [seat rule](3-algorithms.md#no-rider-left-behind-a-seat-for-a-starved-rider) already
+ends every wait; this would shorten the long ones.
 
 ### More seeds on the cells the paired test does not separate
 
@@ -83,9 +83,11 @@ the cost. An earlier version had it; restoring it is small.
 For every new rider, ETA-cost replays each car's route with and without them to find their marginal
 cost, what they would add to the car's total. That costs about 2× the simple schedulers on
 big-bang-0's mean, about 1.6× on the median paired run and up to 10× on the worst one
-([findings](5-findings.md) has the definitions), rising with the backlog. Caching routes within a
-tick, or limiting how far ahead the replay looks, should remove most of that cost without changing
-any decision, though that needs checking.
+([findings](5-findings.md) has the definitions), rising with the backlog. Past saturation it grows
+roughly with the cube of the backlog: 400 requests at tick 0 on one single-seat car took 69 seconds
+of CPU against 1 for round-robin. Caching routes within a tick, or limiting how far ahead the
+replay looks, should remove most of that cost without changing any decision, though that needs
+checking.
 
 ## Deferred experiments
 

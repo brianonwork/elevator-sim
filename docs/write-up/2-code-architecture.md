@@ -70,10 +70,11 @@ A **Scheduler** is asked once per tick for a plan covering every car:
 class Scheduler(Protocol):
     def step(self, state: SimulationState) -> Mapping[int, CarAction]: ...
 
+
 @dataclass(frozen=True)
 class CarAction:
-    target: int | None = None   # floor to move one step toward; None = stay
-    board: tuple[str, ...] = () # ids of waiting requests at this car's floor to admit
+    target: int | None = None  # floor to move one step toward; None = stay
+    board: tuple[str, ...] = ()  # ids of waiting requests at this car's floor to admit
 ```
 
 `state` is an immutable snapshot: `time`, `config`, one `ElevatorView` per car (floor,
@@ -94,7 +95,7 @@ never reassigned. They share one controller and differ only in the assignment po
   heading if a passenger at its floor wants to continue that way; otherwise it reverses. At a
   floor it boards only assigned passengers travelling its way, in assignment order, up to
   capacity. While its oldest pickup has waited `starve_limit` ticks (six round trips,
-  `12 × floors`), it keeps one seat back for that pickup, which bounds every wait.
+  `12 × floors`), it keeps one seat back for that pickup, which ends every wait.
   `simulate()` replays these rules on a copy of the car to predict each passenger's drop-off
   tick, its ETA.
 - **Cost** (`policies.py`): `eta-cost` replays the controller for each candidate car with and
@@ -127,8 +128,7 @@ class NearestCar:
         claimed: set[str] = set()
         for car in state.elevators:
             board = tuple(
-                r.id for r in state.waiting
-                if r.source == car.floor and r.id not in claimed
+                r.id for r in state.waiting if r.source == car.floor and r.id not in claimed
             )[: car.free_capacity]
             claimed.update(board)
             wanted = [r.request.dest for r in car.riders] + [r.source for r in state.waiting]
@@ -145,8 +145,9 @@ BUILTINS["my-nearest-car"] = build
 
 print("available():", available())
 config = BuildingConfig(num_elevators=2, num_floors=60, capacity=8)
-result = Simulation(config, create("my-nearest-car", config),
-                    read_requests("data/sample_requests.csv")).run()
+result = Simulation(
+    config, create("my-nearest-car", config), read_requests("data/sample_requests.csv")
+).run()
 print(f"{result.ticks} ticks")
 print(format_summary(summarize(result.passengers)))
 ```

@@ -42,4 +42,3 @@ def bucketed_max(passengers: Sequence[Passenger], window: int) -> list[tuple[int
         if p.total_time is not None:
             totals.append(p.total_time)
     return [(start, max(totals) if totals else None) for start, totals in sorted(buckets.items())]
-

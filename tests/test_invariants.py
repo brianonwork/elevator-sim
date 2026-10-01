@@ -19,9 +19,7 @@ SCHEDULERS = sorted(BUILTINS)
 SEEDS = range(5)
 
 
-def random_requests(
-    seed: int, n: int = 60, floors: int = 20, horizon: int = 80
-) -> list[Request]:
+def random_requests(seed: int, n: int = 60, floors: int = 20, horizon: int = 80) -> list[Request]:
     rng = random.Random(seed)
     requests = []
     for i in range(n):

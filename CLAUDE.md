@@ -19,11 +19,12 @@ uv sync
 uv run pytest                              # whole suite (10s per-test timeout)
 uv run pytest tests/test_simulation.py -k boarding   # one file / one test
 uv run ruff check .                        # line-length 100, rules E,F,I,UP,B,SIM,D (src only)
+uv run ruff format --check .               # formatting; `uv run ruff format .` to apply
 uv run elevator-sim data/sample_requests.csv --elevators 2 --floors 60 --capacity 8
 ```
 
-`--scheduler`, `--stop-time`, `--max-ticks` and the two `--*-out` log paths are the rest of
-the simulator CLI; `README.md` has the table. There is no fleet-level express setting:
+`--scheduler`, `--stop-time`, `--max-ticks` (default sized from the input) and the two `--*-out`
+log paths are the rest of the simulator CLI; `README.md` has the table. There is no fleet-level express setting:
 `express` is a scheduler (`--scheduler express`, needs two or more cars).
 
 Regenerating results, in this order (`report` reads `run`'s files):
@@ -92,7 +93,7 @@ Inside `algorithms/`, the three layers are deliberately separate:
 - `controller.py` — LOOK with direction commitment, over a small mutable `Car`. `simulate()`
   replays the same rules forward, which is what ETAs are made of. Once a car's oldest pickup
   has waited `starve_limit(config)` ticks (6 round trips, `12 × floors`), the car boards others
-  only while a seat stays free for it; that is what bounds every wait (objective 1), for all
+  only while a seat stays free for it; that is what ends every wait (objective 1), for all
   seven. The threshold is a pure function of the config so the live car (`dispatch.py`) and
   the policies' replays agree; pass it to every `from_view`.
 - `policies.py` — assignment rules only (which car takes a new request). Pure functions of
@@ -136,7 +137,7 @@ dev group. Keep `src/elevator_sim/` stdlib-only.
   - Every number they quote must match `docs/results/*.csv`.
   - Each file stays under 500 words, except `1-overview.md` at 550, `3-algorithms.md` at 750,
     `4-trial-design.md` at 2,700, `5-findings.md` at 2,700, which carries the figures guide,
-    and `6-follow-ups.md` at 1,200 (`wc -w docs/write-up/*.md`);
+    and `6-follow-ups.md` at 1,250 (`wc -w docs/write-up/*.md`);
     trim elsewhere to make room.
   - Written for a first-year college reader, with no padding. Define jargon (Poisson, p95,
     paired t-test, ...) where it first appears.
@@ -185,8 +186,8 @@ dev group. Keep `src/elevator_sim/` stdlib-only.
   comparable.
 - Comparisons are paired per seed (every scheduler sees the identical request file) and read
   against a degrees-of-freedom-aware *t*-critical value, not overlapping min–max ranges.
-- `ruff format` is **not** applied to this codebase (it would reformat most files); only
-  `ruff check` is clean. Match the surrounding hand-wrapped style at 100 columns.
+- `ruff format` is applied to the whole codebase; keep both `ruff check .` and
+  `ruff format --check .` clean.
 - Documentation is written for a junior engineer new to the code. In `src/`:
   - Every module, class, function, method and property (including private helpers and
     nested closures) has a Google-style docstring: a one-line summary ending in a period,

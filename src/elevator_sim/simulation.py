@@ -67,9 +67,7 @@ class Simulation:
     Create it, then call :meth:`run` (or :meth:`step` repeatedly to watch it tick by tick).
     """
 
-    def __init__(
-        self, config: BuildingConfig, scheduler: Scheduler, requests: Iterable[Request]
-    ):
+    def __init__(self, config: BuildingConfig, scheduler: Scheduler, requests: Iterable[Request]):
         """Set up the building with every car on floor 1 and nobody released yet.
 
         Args:
@@ -143,8 +141,7 @@ class Simulation:
         """
         if self._failed is not None:
             raise SchedulingError(
-                f"the simulation stopped at tick {self.time} after an invalid plan: "
-                f"{self._failed}"
+                f"the simulation stopped at tick {self.time} after an invalid plan: {self._failed}"
             )
         self._log_positions()
         self._release_requests()
@@ -381,7 +378,9 @@ class Simulation:
         Raises:
             SchedulingError: the id is not an int in ``0..num_elevators - 1``.
         """
-        if isinstance(elevator_id, int) and 0 <= elevator_id < len(self.elevators):
+        # bool is an int subclass; True must not pass as car 1.
+        is_id = isinstance(elevator_id, int) and not isinstance(elevator_id, bool)
+        if is_id and 0 <= elevator_id < len(self.elevators):
             return self.elevators[elevator_id]
         raise SchedulingError(
             f"plan names elevator {elevator_id!r}; valid ids are 0..{len(self.elevators) - 1}"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -11,14 +12,44 @@ from .models import Passenger, Request
 REQUEST_COLUMNS = ("time", "id", "source", "dest")
 """Columns every request CSV must have (in any order)."""
 PASSENGER_COLUMNS = (
-    "id", "request_time", "source", "dest", "elevator",
-    "pickup_time", "dropoff_time", "wait_time", "travel_time", "total_time",
+    "id",
+    "request_time",
+    "source",
+    "dest",
+    "elevator",
+    "pickup_time",
+    "dropoff_time",
+    "wait_time",
+    "travel_time",
+    "total_time",
 )
 """Header of the passenger log written by :func:`write_passenger_log`, in column order."""
 
 _EXTRA = "__extra__"
 """``DictReader`` restkey. A row with more fields than its header lands here, which is the
 only way to tell a ragged row from a file that simply carries extra columns."""
+
+_INTEGER = re.compile(r"[+-]?[0-9]+")
+"""What a time or floor cell may look like. Stricter than ``int()``, which also takes
+``1_0`` and non-ASCII digits."""
+
+
+def _integer(text: str) -> int:
+    """Parse one CSV cell as a plain decimal integer.
+
+    Args:
+        text: The cell's text; surrounding whitespace is ignored.
+
+    Returns:
+        The integer value.
+
+    Raises:
+        ValueError: the cell is anything but an optional sign followed by ASCII digits.
+    """
+    text = text.strip()
+    if not _INTEGER.fullmatch(text):
+        raise ValueError(f"invalid integer: {text!r}")
+    return int(text)
 
 
 def read_requests(path: str | Path) -> list[Request]:
@@ -38,9 +69,9 @@ def read_requests(path: str | Path) -> list[Request]:
         One :class:`Request` per non-blank row, in file order.
 
     Raises:
-        ValueError: a required column is missing from the header, or a row is ragged, has
-            an empty value, or has a number that does not parse or is invalid (see
-            :class:`Request`).
+        ValueError: a required column is missing from the header or appears twice, or a
+            row is ragged, has an empty value, or has a number that does not parse or is
+            invalid (see :class:`Request`).
         OSError: the file cannot be opened.
     """
     # utf-8-sig drops the byte-order mark Excel writes, which would otherwise glue itself to
@@ -54,6 +85,10 @@ def read_requests(path: str | Path) -> list[Request]:
         missing = [c for c in REQUEST_COLUMNS if c not in (reader.fieldnames or [])]
         if missing:
             raise ValueError(f"{path}: missing column(s) {missing}; need {list(REQUEST_COLUMNS)}")
+        # DictReader keeps only the last of two same-named columns, silently.
+        repeated = [c for c in REQUEST_COLUMNS if reader.fieldnames.count(c) > 1]
+        if repeated:
+            raise ValueError(f"{path}: column(s) {repeated} appear more than once in the header")
 
         requests: list[Request] = []
         for row in reader:
@@ -72,21 +107,19 @@ def read_requests(path: str | Path) -> list[Request]:
                 raise ValueError(f"{path} row {line}: missing value(s) for {absent}")
             try:
                 request = Request(
-                    time=int(row["time"]),
+                    time=_integer(row["time"]),
                     id=row["id"].strip(),
-                    source=int(row["source"]),
-                    dest=int(row["dest"]),
+                    source=_integer(row["source"]),
+                    dest=_integer(row["dest"]),
                 )
-            # Covers both int() failures and Request's own checks; add the row number.
+            # Covers both unparsable numbers and Request's own checks; add the row number.
             except ValueError as e:
                 raise ValueError(f"{path} row {line}: {e}") from None
             requests.append(request)
     return requests
 
 
-def write_positions_log(
-    path: str | Path, log: Iterable[tuple[int, tuple[int, ...]]]
-) -> None:
+def write_positions_log(path: str | Path, log: Iterable[tuple[int, tuple[int, ...]]]) -> None:
     """Write one row per tick: ``time,elevator_0,elevator_1,...``.
 
     The fleet size comes from the rows themselves rather than from a parameter that could
@@ -130,11 +163,21 @@ def write_passenger_log(path: str | Path, passengers: Iterable[Passenger]) -> No
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(PASSENGER_COLUMNS)
-        # One row per passenger, in input order; cell order matches PASSENGER_COLUMNS.
+        # One row per passenger, in the order given (the CLI passes release order, i.e.
+        # by request time); cell order matches PASSENGER_COLUMNS.
         for p in passengers:
             r = p.request
-            writer.writerow([
-                r.id, r.time, r.source, r.dest, cell(p.elevator_id),
-                cell(p.pickup_time), cell(p.dropoff_time),
-                cell(p.wait_time), cell(p.travel_time), cell(p.total_time),
-            ])
+            writer.writerow(
+                [
+                    r.id,
+                    r.time,
+                    r.source,
+                    r.dest,
+                    cell(p.elevator_id),
+                    cell(p.pickup_time),
+                    cell(p.dropoff_time),
+                    cell(p.wait_time),
+                    cell(p.travel_time),
+                    cell(p.total_time),
+                ]
+            )

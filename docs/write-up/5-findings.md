@@ -116,7 +116,7 @@ ETA-cost's.
 place: in the morning rush it came within 19% of ETA-cost and beat nearest-car fourfold. On random
 traffic (the baseline pattern) it was the worst of all, because when cars are often idle, where each
 stands is the whole decision. There ETA-cost's average trip is nearly half round-robin's (35 against
-68 ticks).
+67 ticks).
 
 **Zone-based**, which gives each car a home band of floors, fails the morning rush, at three times
 ETA-cost's average trip, because cars sit parked away from the lobby. It comes last on four other

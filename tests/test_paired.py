@@ -37,7 +37,7 @@ def test_an_identical_gap_on_every_seed_is_separated():
 
 def test_noise_larger_than_the_gap_is_not_separated():
     a = {0: 10.0, 1: 10.0, 2: 10.0}
-    b = {0: 40.0, 1: 0.0, 2: 1.0}      # mean +3.7, swamped by its own spread
+    b = {0: 40.0, 1: 0.0, 2: 1.0}  # mean +3.7, swamped by its own spread
     assert not paired_diff(a, b).separated()
 
 

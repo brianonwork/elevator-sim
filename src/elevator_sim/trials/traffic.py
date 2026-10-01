@@ -30,6 +30,7 @@ RESAMPLE_LIMIT = 50
 
 # -- flow ------------------------------------------------------------------------------
 
+
 def point(floor: int) -> Dist:
     """Build a floor distribution that is always one floor: a lobby, a hub, a convoy endpoint.
 
@@ -223,6 +224,7 @@ def ramp(rate: float, climb: int) -> Arrival:
 
 # -- generation ------------------------------------------------------------------------
 
+
 def generate(
     mixture: Mixture,
     arrival: Arrival,
@@ -291,6 +293,7 @@ def generate(
 
 
 # -- csv -------------------------------------------------------------------------------
+
 
 def write_requests(path: str | Path, requests: Iterable[Request]) -> None:
     """Write requests in the CLI's own ``time,id,source,dest`` format.

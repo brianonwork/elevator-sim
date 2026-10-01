@@ -116,17 +116,19 @@ def test_on_one_car_only_parking_separates_zone_based_from_the_rest():
         return Simulation(config, scheduler, requests).run().positions_log
 
     baseline = log(create("eta-cost", config))
-    assert all(log(create(n, config)) == baseline
-               for n in ("eta-cost-fair", "nearest-car", "nearest-car-eta", "round-robin"))
-    assert log(DestinationDispatch(ZoneBased())) == baseline   # assignment alone agrees
-    assert log(build_zone_based(config)) != baseline           # parking is the difference
+    assert all(
+        log(create(n, config)) == baseline
+        for n in ("eta-cost-fair", "nearest-car", "nearest-car-eta", "round-robin")
+    )
+    assert log(DestinationDispatch(ZoneBased())) == baseline  # assignment alone agrees
+    assert log(build_zone_based(config)) != baseline  # parking is the difference
 
 
 @pytest.mark.parametrize("cars,floors", [(3, 2), (5, 3), (10, 5)])
 def test_zone_based_serves_a_fleet_larger_than_the_building(cars, floors):
     """More cars than floors is a legal config; every car still needs a real park floor."""
     config = BuildingConfig(num_elevators=cars, num_floors=floors, capacity=4)
-    result = Simulation(
-        config, build_zone_based(config), [Request(0, "a", 1, floors)]
-    ).run(max_ticks=500)
+    result = Simulation(config, build_zone_based(config), [Request(0, "a", 1, floors)]).run(
+        max_ticks=500
+    )
     assert result.passengers[0].is_done

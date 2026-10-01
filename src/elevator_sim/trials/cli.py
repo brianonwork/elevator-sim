@@ -161,19 +161,25 @@ def cmd_run(args: argparse.Namespace) -> int:
     stale = runner.stale_cells(results)
     # Show only the first five stale rows; the count says how many there are.
     if stale:
-        print(f"warning: {len(stale)} existing row(s) were generated at a different arrival "
-              f"rate and will not be re-run; delete them to regenerate:")
+        print(
+            f"warning: {len(stale)} existing row(s) were generated at a different arrival "
+            f"rate and will not be re-run; delete them to regenerate:"
+        )
         for line in stale[:5]:
             print(f"  {line}")
     # Resume skips a finished cell whatever code produced it, so say when the code moved.
     if runner.source_changed(results):
-        print(f"warning: the simulator or trial source has changed since {results} was "
-              f"recorded (or it has no {runner.STAMP}); finished cells will not be re-run. "
-              f"If the change can move results, delete {results} and "
-              f"{series} and run again.")
+        print(
+            f"warning: the simulator or trial source has changed since {results} was "
+            f"recorded (or it has no {runner.STAMP}); finished cells will not be re-run. "
+            f"If the change can move results, delete {results} and "
+            f"{series} and run again."
+        )
     result = runner.run_all(todo, path=results, jobs=args.jobs)
-    print(f"{result.written} new rows in {results}; "
-          f"{result.series_backfilled} cell(s) had only their series backfilled")
+    print(
+        f"{result.written} new rows in {results}; "
+        f"{result.series_backfilled} cell(s) had only their series backfilled"
+    )
     # Any failure makes the exit code 1, so a script can tell the run is incomplete.
     if result.failures:
         print(f"{len(result.failures)} cell(s) failed and are missing from the results:")
@@ -255,44 +261,48 @@ def build_parser() -> argparse.ArgumentParser:
         description="Generate traffic, run the scheduler comparison, and report it.",
     )
     parser.add_argument(
-        "--results-dir", type=Path, default=None,
+        "--results-dir",
+        type=Path,
+        default=None,
         help=f"directory the results are read from and written to (default: "
-             f"{DEFAULT_RESULTS_DIR} under the working directory, which must already exist "
-             f"for a command that writes)",
+        f"{DEFAULT_RESULTS_DIR} under the working directory, which must already exist "
+        f"for a command that writes)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
     # Shared --jobs option, attached to each subcommand that uses a worker pool.
     parallel = argparse.ArgumentParser(add_help=False)
-    parallel.add_argument("--jobs", type=int, default=None,
-                          help="worker processes (default: one per CPU)")
+    parallel.add_argument(
+        "--jobs", type=int, default=None, help="worker processes (default: one per CPU)"
+    )
 
     # gen defaults to seed 0 (not one of the experiments' seeds) on the reference building,
     # written to ./requests.csv.
     p = sub.add_parser("gen", help="write one preset's request file")
     p.add_argument("preset")
-    p.add_argument("--building", default=REFERENCE_BUILDING.name,
-                   choices=[b.name for b in BUILDINGS])
+    p.add_argument(
+        "--building", default=REFERENCE_BUILDING.name, choices=[b.name for b in BUILDINGS]
+    )
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", type=Path, default=Path("requests.csv"))
     p.set_defaults(func=cmd_gen)
 
     # --preset and --building can each be repeated to pick several; none given = all.
-    p = sub.add_parser("run", parents=[parallel],
-                       help="run every experiment, resuming where it left off")
+    p = sub.add_parser(
+        "run", parents=[parallel], help="run every experiment, resuming where it left off"
+    )
     p.add_argument("--preset", action="append", default=[])
     p.add_argument("--building", action="append", default=[], choices=[b.name for b in BUILDINGS])
     p.set_defaults(func=cmd_run)
 
-    p = sub.add_parser("fairness",
-                       help="follow-up: sweep the eta-cost exponent at one cell")
+    p = sub.add_parser("fairness", help="follow-up: sweep the eta-cost exponent at one cell")
     p.set_defaults(func=cmd_fairness)
 
     p = sub.add_parser(
         "sweep",
         parents=[parallel],
         help="follow-up: run the demand sweep on the reference building "
-             "(always overwrites; unlike run, an interrupted sweep is not resumed)",
+        "(always overwrites; unlike run, an interrupted sweep is not resumed)",
     )
     p.set_defaults(func=cmd_sweep)
 
@@ -316,8 +326,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (OSError, ValueError, KeyError, RuntimeError, csv.Error,
-            SchedulingError, SimulationStalled) as e:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+        csv.Error,
+        SchedulingError,
+        SimulationStalled,
+    ) as e:
         # Expected failures get a one-line message on stderr instead of a traceback.
         print(f"elevator-trials: {e}", file=sys.stderr)
         return 1

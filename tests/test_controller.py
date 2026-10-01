@@ -20,6 +20,7 @@ from elevator_sim.algorithms.controller import (
 )
 from elevator_sim.algorithms.dispatch import DestinationDispatch
 from elevator_sim.models import BuildingConfig, Direction, ElevatorView, Request, Rider
+from elevator_sim.scheduler import ReplayError
 from elevator_sim.simulation import Simulation
 
 UP, DOWN, IDLE = Direction.UP, Direction.DOWN, Direction.IDLE
@@ -30,8 +31,15 @@ def req(id, source, dest, time=0):
 
 
 def car(floor, heading=IDLE, riders=(), pickups=(), capacity=8, held=0, starve_after=None):
-    return Car(floor=floor, heading=heading, capacity=capacity,
-               riders=list(riders), pickups=list(pickups), held=held, starve_after=starve_after)
+    return Car(
+        floor=floor,
+        heading=heading,
+        capacity=capacity,
+        riders=list(riders),
+        pickups=list(pickups),
+        held=held,
+        starve_after=starve_after,
+    )
 
 
 class TestBasics:
@@ -45,11 +53,16 @@ class TestBasics:
 
     def test_from_view_copies_riders_pickups_and_remaining_hold(self):
         r = req("r", 1, 9)
-        view = ElevatorView(id=0, floor=4, capacity=3,
-                            riders=(Rider(r, 1),), held_until=7)
+        view = ElevatorView(id=0, floor=4, capacity=3, riders=(Rider(r, 1),), held_until=7)
         c = from_view(view, UP, [req("p", 6, 8)], now=5)
         assert (c.floor, c.heading, c.capacity, c.riders, [p.id for p in c.pickups], c.held) == (
-            4, UP, 3, [r], ["p"], 2)
+            4,
+            UP,
+            3,
+            [r],
+            ["p"],
+            2,
+        )
         assert c.free_capacity == 2
 
 
@@ -58,9 +71,10 @@ class TestNextHeading:
         # Discriminating on purpose: the nearest stop is the pickup at 4, so rule 5 would
         # reverse and carry the seated rider away from floor 9. Deleting rule 1 flips this
         # to DOWN, which is the whole point of the rule.
-        assert next_heading(
-            car(5, IDLE, riders=[req("r", 1, 9)], pickups=[req("p", 4, 1)]), now=0
-        ) is UP
+        assert (
+            next_heading(car(5, IDLE, riders=[req("r", 1, 9)], pickups=[req("p", 4, 1)]), now=0)
+            is UP
+        )
 
     def test_a_loaded_car_with_nothing_ahead_reverses_instead_of_freezing(self):
         # heading UP with the only rider bound for 2: nothing is ahead, so the car must turn
@@ -114,8 +128,12 @@ class TestStarvedRiderKeepsASeat:
 
     @staticmethod
     def two_seat_car(starve_after):
-        return car(5, capacity=2, starve_after=starve_after,
-                   pickups=[req("s", 2, 1), req("a", 5, 8, time=50), req("b", 5, 9, time=51)])
+        return car(
+            5,
+            capacity=2,
+            starve_after=starve_after,
+            pickups=[req("s", 2, 1), req("a", 5, 8, time=50), req("b", 5, 9, time=51)],
+        )
 
     def test_the_limit_is_six_round_trips_of_two_ticks_per_floor(self):
         assert starve_limit(BuildingConfig(num_elevators=1, num_floors=60, capacity=8)) == 720
@@ -153,8 +171,9 @@ class TestStarvedRiderKeepsASeat:
         # Heading UP on floor 5 with nothing above, "s" starved below and "a" here going up.
         # The only seat is kept for "s", so "a" cannot board and no stop appears ahead:
         # extending the sweep (rule 3) would leave the car on floor 5 for good.
-        c = car(5, UP, capacity=1, starve_after=100,
-                pickups=[req("s", 2, 1), req("a", 5, 8, time=50)])
+        c = car(
+            5, UP, capacity=1, starve_after=100, pickups=[req("s", 2, 1), req("a", 5, 8, time=50)]
+        )
         assert next_heading(c, now=99) is UP
         assert next_heading(c, now=100) is DOWN
         assert plan_car(c, 100) == (DOWN, [], 2)
@@ -163,8 +182,7 @@ class TestStarvedRiderKeepsASeat:
 
     def test_the_starved_rider_boards_first_on_its_own_floor(self):
         # Car on floor 2 heading down, one seat: "s" is oldest, so it takes the seat.
-        c = car(2, capacity=1, starve_after=10,
-                pickups=[req("s", 2, 1), req("t", 2, 1, time=5)])
+        c = car(2, capacity=1, starve_after=10, pickups=[req("s", 2, 1), req("t", 2, 1, time=5)])
         assert [p.id for p in boarding(c, DOWN, now=10)] == ["s"]
 
     def test_the_replay_still_delivers_everyone(self):
@@ -224,15 +242,28 @@ class TestSimulate:
     def test_boarded_at_records_each_pickups_boarding_tick(self):
         # Same run as the return-pass test: a boards t0, b boards on the way back at t8.
         boarded: dict[str, int] = {}
-        simulate(car(1, pickups=[req("a", 1, 6), req("b", 3, 1)]), now=0, stop_time=0,
-                 boarded_at=boarded)
+        simulate(
+            car(1, pickups=[req("a", 1, 6), req("b", 3, 1)]), now=0, stop_time=0, boarded_at=boarded
+        )
         assert boarded == {"a": 0, "b": 8}
 
     def test_initial_hold_is_respected_and_now_offsets_ticks(self):
         # held 2 ticks from t10: moves at t12 and t13, arrives for t14.
-        assert simulate(
-            car(1, UP, riders=[req("a", 1, 3)], held=2), now=10, stop_time=0
-        ) == {"a": 14}
+        assert simulate(car(1, UP, riders=[req("a", 1, 3)], held=2), now=10, stop_time=0) == {
+            "a": 14
+        }
+
+    def test_a_backlog_longer_than_100_000_ticks_is_replayed_to_the_end(self):
+        # One seat and 2,000 riders each crossing 40 floors: about 160,000 ticks of work.
+        # The guard is sized from the workload, so a long drain is not a "runaway".
+        pickups = [req(f"p{i}", 1, 41) for i in range(2000)]
+        etas = simulate(car(1, capacity=1, pickups=pickups), now=0, stop_time=0)
+        assert len(etas) == 2000
+        assert max(etas.values()) > 100_000
+
+    def test_an_explicit_max_ticks_still_raises(self):
+        with pytest.raises(ReplayError):
+            simulate(car(1, pickups=[req("a", 1, 41)]), now=0, stop_time=0, max_ticks=10)
 
 
 class TestReplayAgreesWithTheEngine:
@@ -272,7 +303,10 @@ class TestReplayAgreesWithTheEngine:
         # prediction of the whole run rather than of a moving target.
         sim.step()
         snapshot = from_view(
-            sim.state.elevators[0], scheduler.heading[0], scheduler.assigned[0], sim.time,
+            sim.state.elevators[0],
+            scheduler.heading[0],
+            scheduler.assigned[0],
+            sim.time,
             starve_after=starve_limit(config),
         )
         boarded: dict[str, int] = {}
