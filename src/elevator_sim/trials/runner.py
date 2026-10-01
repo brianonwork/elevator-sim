@@ -31,6 +31,7 @@ comparison** -- scheduler A and scheduler B are compared seed by seed on the sam
 from __future__ import annotations
 
 import csv
+import hashlib
 import os
 import time
 from collections.abc import Iterator, Sequence
@@ -73,6 +74,12 @@ SERIES_COLUMNS = ("preset", "building", "variant", "scheduler", "seed",
                   "window_start", "total_max")
 """Header of ``runs-windows.csv``: the cell's identity, then one window's start tick and max."""
 
+STAMP = "runs.source-hash"
+"""File beside ``runs.csv`` holding the fingerprint of the code that produced its rows."""
+UNHASHED = ("cli.py", "trials/cli.py", "trials/report.py")
+"""Source files left out of the fingerprint: they parse arguments and draw tables, and
+cannot change a results row."""
+
 COLUMNS = (
     "preset", "building", "variant", "scheduler", "seed",
     "served", "unserved",
@@ -80,8 +87,9 @@ COLUMNS = (
     "total_min", "total_max", "total_mean", "total_p95",
     "span", "seconds",
 )
-"""Header of ``runs.csv``. Times are in ticks; ``seconds`` is wall-clock compute time. Every
-run drains, so ``unserved`` is always 0; it is kept as a check."""
+"""Header of ``runs.csv``. Times are in ticks; ``seconds`` is the CPU time the simulation took
+(``time.process_time`` in the worker that ran it). Every run drains, so ``unserved`` is always
+0; it is kept as a check."""
 
 
 @dataclass(frozen=True)
@@ -150,9 +158,15 @@ def variant_of(preset: Preset, building: Building, name: str) -> Variant:
         The matching ``Variant``.
 
     Raises:
-        StopIteration: no variant of that name exists for this preset and building.
+        KeyError: no variant of that name exists for this preset and building.
     """
-    return next(v for v in preset.variants(building) if v.name == name)
+    by_name = {v.name: v for v in preset.variants(building)}
+    if name not in by_name:
+        raise KeyError(
+            f"no variant {name!r} for {preset.name} on {building.name}; "
+            f"it has {sorted(by_name)}"
+        )
+    return by_name[name]
 
 
 def run_cell(cell: Cell, *, load: float | None = None) -> dict[str, object]:
@@ -170,8 +184,7 @@ def run_cell(cell: Cell, *, load: float | None = None) -> dict[str, object]:
         ``runs-windows.csv`` rows, one per window that had arrivals. Times are in ticks.
 
     Raises:
-        KeyError: the cell names an unknown preset, building or scheduler.
-        StopIteration: the cell's variant does not exist for its preset and building.
+        KeyError: the cell names an unknown preset, building, variant or scheduler.
     """
     # Turn the cell's names back into the objects they stand for.
     preset = BY_PRESET_NAME[cell.preset]
@@ -187,9 +200,12 @@ def run_cell(cell: Cell, *, load: float | None = None) -> dict[str, object]:
     # passenger is scored.
     config = config_for(building, variant)
     scheduler = create(cell.scheduler, config)
-    started = time.perf_counter()
+    # CPU time, not wall-clock: cells run in a pool with one worker per CPU, where the wall
+    # clock also counts the time a worker spends waiting for a core (measured at about 2.5
+    # times the serial figure, and up to 7 times on single cells).
+    started = time.process_time()
     result = Simulation(config, scheduler, requests).run(max_ticks=MAX_TICKS)
-    elapsed = time.perf_counter() - started
+    elapsed = time.process_time() - started
 
     # Summarise every passenger: nothing is trimmed from the start of the run.
     summary = summarize(result.passengers)
@@ -298,6 +314,66 @@ def stale_cells(path: Path = RESULTS) -> list[str]:
     return stale
 
 
+def fingerprinted_files() -> list[Path]:
+    """Return the source files whose contents decide a results row.
+
+    Returns:
+        Every ``.py`` file of the package except ``UNHASHED``, as sorted paths relative to
+        the package root.
+    """
+    root = Path(__file__).resolve().parent.parent
+    files = (p.relative_to(root) for p in root.rglob("*.py"))
+    return sorted(p for p in files if p.as_posix() not in UNHASHED)
+
+
+def source_fingerprint() -> str:
+    """Return a hash of the simulator, scheduler and trial-design source.
+
+    ``done_cells`` keys on a cell's identity alone, so after an edit to the controller, a
+    policy or a preset every old row still reads as finished and ``run`` would write
+    nothing. Nothing in a row says which code produced it; this does, for the whole file.
+    It is deliberately coarse: a comment edit changes it too, and the cost of that is one
+    warning, where the cost of missing a real change is a report built on stale numbers.
+
+    Returns:
+        A SHA-256 hex digest over each file's relative path and bytes.
+    """
+    root = Path(__file__).resolve().parent.parent
+    digest = hashlib.sha256()
+    for relative in fingerprinted_files():
+        digest.update(relative.as_posix().encode())
+        digest.update((root / relative).read_bytes())
+    return digest.hexdigest()
+
+
+def stamp_path(path: Path = RESULTS) -> Path:
+    """Return where the fingerprint for a results file is kept.
+
+    Args:
+        path: The results CSV.
+
+    Returns:
+        ``STAMP`` in the same directory.
+    """
+    return path.parent / STAMP
+
+
+def source_changed(path: Path = RESULTS) -> bool:
+    """Return whether existing results were recorded under different code than today's.
+
+    Args:
+        path: The results CSV to check.
+
+    Returns:
+        True when ``path`` holds rows and its stamp is missing or differs from
+        :func:`source_fingerprint`; False when there are no results yet or the stamp matches.
+    """
+    if not path.exists() or path.stat().st_size == 0:
+        return False
+    stamp = stamp_path(path)
+    return not stamp.exists() or stamp.read_text().strip() != source_fingerprint()
+
+
 def _work(payload):
     """Run one cell in a pool worker, for both the experiments and the sweep.
 
@@ -357,6 +433,10 @@ def run_all(
     # data row to one -- which breaks done_cells and every reader downstream.
     fresh = not path.exists() or path.stat().st_size == 0
     fresh_series = not series_path.exists() or series_path.stat().st_size == 0
+    # Stamp only a run that starts from nothing: every row it will hold comes from this
+    # code. Rows already on disk keep whatever stamp they were recorded under.
+    if fresh and fresh_series:
+        stamp_path(path).write_text(source_fingerprint() + "\n")
     written = backfilled = 0
     # The parent owns both files: workers return their rows rather than appending, so
     # there is no interleaving between processes.

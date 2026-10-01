@@ -24,8 +24,8 @@ only way to tell a ragged row from a file that simply carries extra columns."""
 def read_requests(path: str | Path) -> list[Request]:
     """Parse a ``time,id,source,dest`` CSV. Columns may appear in any order.
 
-    Extra columns are ignored, which is how a generated file's ``flow`` column survives a
-    round trip. Raises ``ValueError`` naming the offending row for anything else -- a row
+    Extra columns are ignored, so a file may carry notes of its own (a ``flow`` label per
+    row, say). Raises ``ValueError`` naming the offending row for anything else -- a row
     ragged against its own header, a missing value or an unparsable number -- so a bad file
     never reaches the caller as a ``TypeError``. Rows are returned in file order; the
     simulation sorts them by time itself, and checks ids are unique and floors fit the

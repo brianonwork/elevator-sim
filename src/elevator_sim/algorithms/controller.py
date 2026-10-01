@@ -207,7 +207,8 @@ def _ahead(floor: int, heading: Direction, floors: set[int]) -> set[int]:
 
 
 def next_heading(
-    car: Car, pending: set[int] | None = None, here: Sequence[Request] | None = None
+    car: Car, pending: set[int] | None = None, here: Sequence[Request] | None = None,
+    now: int = 0,
 ) -> Direction:
     """Return the direction the car commits to this tick.
 
@@ -216,11 +217,11 @@ def next_heading(
 
     First matching rule wins: (1) riders aboard and no heading yet -- head toward the first
     rider's destination; (2) heading set with a stop ahead -- keep it; (3) heading set,
-    nothing ahead, but a stop behind and a pickup at this floor continuing that way -- keep
-    it, extending the sweep before turning back; (4) heading set with stops only behind --
-    reverse; (5) heading idle with a stop elsewhere -- head for the nearest one, lower floor
-    on ties; (6) nothing elsewhere but a pickup at this floor -- follow the earliest-assigned
-    one's travel direction; (7) otherwise idle.
+    nothing ahead, but a stop behind and a pickup at this floor that would board and continue
+    that way -- keep it, extending the sweep before turning back; (4) heading set with stops
+    only behind -- reverse; (5) heading idle with a stop elsewhere -- head for the nearest
+    one, lower floor on ties; (6) nothing elsewhere but a pickup at this floor -- follow the
+    earliest-assigned one's travel direction; (7) otherwise idle.
 
     A loaded car never reverses away from its riders, because every rider destination is a
     stop and rule 2 keeps the heading while any of them lies ahead. Rule 1 does not need to
@@ -229,6 +230,12 @@ def next_heading(
     heading returns no target and the car stands still for good, re-committing the same
     heading every tick. Falling through to rule 4 reverses and delivers them instead.
 
+    Rule 3 asks whether a pickup here *would board*, not merely whether one is going the
+    car's way. The two differ when the car's only free seat is kept for a starved rider
+    elsewhere (:func:`boarding`): nobody boards, so no stop appears ahead, and keeping the
+    heading would leave the car standing here for good. Rule 4 then turns it round toward
+    the starved rider instead.
+
     ``pending`` and ``here`` are ``stops(car)`` and ``waiting_here(car)``; ``plan_car``
     passes them in so the replay's inner loop derives them once instead of three times.
 
@@ -236,6 +243,8 @@ def next_heading(
         car: The car to decide for. Not mutated.
         pending: Precomputed ``stops(car)``; ``None`` = compute it here.
         here: Precomputed ``waiting_here(car)``; ``None`` = compute it here.
+        now: The current tick, which decides whether a seat is being kept for a starved
+            rider and so whether a pickup here would board.
 
     Returns:
         ``UP``, ``DOWN`` or ``IDLE`` (nothing to do anywhere).
@@ -249,8 +258,8 @@ def next_heading(
         # Rule 2: a stop still lies ahead, so keep sweeping.
         if _ahead(car.floor, car.heading, pending):
             return car.heading
-        # Rule 3: nothing ahead, but someone here wants to keep going our way.
-        if pending and any(p.direction is car.heading for p in here):
+        # Rule 3: nothing ahead, but someone here will board and keep going our way.
+        if pending and boarding(car, car.heading, here, now):
             return car.heading
         # Rule 4: stops only behind, so reverse (Direction is +1/-1, so negation flips it).
         if pending:
@@ -344,7 +353,7 @@ def plan_car(car: Car, now: int) -> tuple[Direction, list[Request], int | None]:
         this tick, and the floor to move toward (``None`` = stay put).
     """
     pending, here = stops(car), waiting_here(car)
-    heading = next_heading(car, pending, here)
+    heading = next_heading(car, pending, here, now)
     boarded = boarding(car, heading, here, now)
     return heading, boarded, next_target(car, heading, boarded, pending)
 

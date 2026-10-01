@@ -97,7 +97,9 @@ uv run elevator-trials fairness    # follow-up, not in the reported results: exp
 ```
 
 The repository includes one request file per pattern for the reference building (60 floors, four
-cars, eight seats per car) in `data/`. Every other file is regenerated exactly from its seed.
+cars, eight seats per car) in `data/`: the first of the ten the experiments ran, written by
+`gen <preset> --seed N` with N = 10000 for the first pattern, 20000 for the second, up to 80000.
+Every other file is regenerated the same way from its seed.
 
 ## Time spent
 
@@ -112,8 +114,8 @@ gives the full list, marking each as stated by the prompt or chosen by us, and
 - A stop costs `--stop-time` ticks, 0 by default, because the prompt prices only travel.
 - Requests are released strictly in time order; no scheduler sees the future.
 - A request is bound to one car the tick it appears and is never reassigned, so a rider who does
-  not fit waits for that car's next visit. After six round trips of waiting, the car keeps a seat
-  free for them, so every wait is bounded.
+  not fit waits for that car's next visit. After six round trips of waiting (`12 × floors`
+  ticks), the car keeps a seat free for them, so every wait is bounded.
 - Direction logic: a car carrying riders never reverses and picks up only people going its way,
   so a rider going against the sweep waits for the return pass.
 - All cars start idle on floor 1. Any car can stop at any floor; express service is a

@@ -35,15 +35,24 @@ def random_requests(
 BUILDINGS = {
     "free-stops": BuildingConfig(num_elevators=3, num_floors=20, capacity=4),
     "costly-stops": BuildingConfig(num_elevators=3, num_floors=20, capacity=4, stop_time=2),
+    "one-seat-one-car": BuildingConfig(num_elevators=1, num_floors=20, capacity=1),
+    "one-seat-two-cars": BuildingConfig(num_elevators=2, num_floors=20, capacity=1),
 }
 """Free stops and stops that cost time. The invariants are properties of the spec, so they
 must hold in both -- and stop_time otherwise rests on a handful of hand-traced tests. Every
-scheduler, the express one included, runs on both."""
+scheduler, the express one included, runs on both.
+
+The two one-seat buildings are there for the starvation rule: with one seat a queue builds
+past ``starve_limit``, so the seat a car keeps for its oldest rider is its only seat, which
+is the case most likely to leave a car with nothing it is allowed to do."""
 
 
 @pytest.fixture(params=sorted(BUILDINGS), ids=sorted(BUILDINGS))
 def config(request) -> BuildingConfig:
-    return BUILDINGS[request.param]
+    building = BUILDINGS[request.param]
+    if request.node.callspec.params.get("name") == "express" and building.num_elevators < 2:
+        pytest.skip("express needs two cars")
+    return building
 
 
 @pytest.mark.parametrize("name", SCHEDULERS)
@@ -126,10 +135,12 @@ def test_a_draining_burst_leaves_no_rider_waiting_past_a_few_round_trips(name, s
     stop at t=80 and total service is only about five round trips (~200 ticks), so a wait past
     an 8-round-trip bound is a bug, not congestion.
 
-    It does not show that no rider waits indefinitely under arrivals that never stop: no
-    built-in guarantees that (see "Limit: starvation under sustained load" in
-    ``docs/write-up/3-algorithms.md``).
+    It does not show that waits stay bounded under arrivals that never stop. That is the
+    controller's starved-rider seat, tested in ``test_starvation.py`` and, with one-seat
+    cars, by every other invariant in this file.
     """
+    if config.capacity == 1:
+        pytest.skip("the 8-round-trip bound assumes four seats; one seat queues far longer")
     round_trip = 2 * config.num_floors
     result = Simulation(
         config, BUILTINS[name](config), random_requests(seed)

@@ -140,6 +140,18 @@ class TestStarvedRiderKeepsASeat:
         c.capacity = 1
         assert boarding(c, UP, now=100) == []
 
+    def test_a_one_seat_car_turns_back_for_the_starved_rider_instead_of_freezing(self):
+        # Heading UP on floor 5 with nothing above, "s" starved below and "a" here going up.
+        # The only seat is kept for "s", so "a" cannot board and no stop appears ahead:
+        # extending the sweep (rule 3) would leave the car on floor 5 for good.
+        c = car(5, UP, capacity=1, starve_after=100,
+                pickups=[req("s", 2, 1), req("a", 5, 8, time=50)])
+        assert next_heading(c, now=99) is UP
+        assert next_heading(c, now=100) is DOWN
+        assert plan_car(c, 100) == (DOWN, [], 2)
+        # 3 ticks down to "s", 1 to floor 1, then back up 4 for "a" and 3 more to floor 8.
+        assert simulate(c, now=100, stop_time=0) == {"s": 104, "a": 111}
+
     def test_the_starved_rider_boards_first_on_its_own_floor(self):
         # Car on floor 2 heading down, one seat: "s" is oldest, so it takes the seat.
         c = car(2, capacity=1, starve_after=10,

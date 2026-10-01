@@ -44,3 +44,19 @@ def test_every_scheduler_boards_the_rider_within_the_limit_plus_a_few_sweeps(
     # Once starved: riders aboard get off within one round trip, then the car passes floor
     # 3 going down within two more.
     assert wait <= starve_limit(config) + 3 * 2 * config.num_floors
+
+
+@pytest.mark.parametrize("policy", sorted(set(BUILTINS) - {"express"}))
+def test_a_one_seat_car_is_never_left_with_nothing_it_may_do(policy):
+    # The victim (3 -> 2) is passed over by a 4 -> 2 stream until it is starved, while
+    # riders at floor 2 ask to go further down. A one-seat car that has just emptied at
+    # floor 2 then has a pickup going its way that may not board, because its only seat is
+    # kept for the victim. It must turn back for the victim, not wait there for ever.
+    config = BuildingConfig(num_elevators=1, num_floors=6, capacity=1)
+    requests = [Request(0, "victim", 3, 2)]
+    requests += [Request(t, f"a{t}", 4, 2) for t in range(150)]
+    requests += [Request(t, f"b{t}", 2, 1) for t in range(0, 150, 3)]
+    result = Simulation(config, create(policy, config), requests).run(max_ticks=20_000)
+    assert all(p.is_done for p in result.passengers)
+    (victim,) = [p for p in result.passengers if p.request.id == "victim"]
+    assert victim.wait_time <= starve_limit(config) + 3 * 2 * config.num_floors

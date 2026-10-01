@@ -158,10 +158,10 @@ do not shorten the wait for a sweep to come back.
 ### What it costs to compute
 
 ETA-cost replays every car's future route for each new rider, so it does more work: over
-big-bang-0's runs, about 2.1 times as long as the three original simple schedulers (0.19 against
-0.09 seconds). Pairing runs on the same list is fairer: the median pair costs 1.6 times as much and
-the worst, overload on the 30-floor building, 10 times. Nearest-car by time costs 1.4 times and
-express 1.5 times. The cost grows with the queue of waiting riders.
+big-bang-0's runs, about 2.2 times the processor time of the three original simple schedulers
+(0.15 against 0.07 seconds). Pairing runs on the same list is fairer: the median pair costs 1.6
+times as much and the worst, overload on the sixteen-seat building, 10 times. Nearest-car by time
+costs 1.3 times and express 1.4 times. The cost grows with the queue of waiting riders.
 
 ## Big-bang-1: the same with 1-tick stops
 
@@ -175,7 +175,7 @@ big-bang-0 do not reappear.
 The leader changes in 26 cases: 16 swap between ETA-cost and ETA-cost fair, 7 between ETA-cost fair
 and nearest-car by time, and 3 between ETA-cost fair and express. The tied-for-best set changes in
 only 18. Express leads two cases, overload on the two-car and sixteen-seat buildings, and is worse
-than ETA-cost in 54 of 56. ETA-cost costs more to compute: 3.3 times the simple schedulers on
+than ETA-cost in 54 of 56. ETA-cost costs more to compute: 3.5 times the simple schedulers on
 average, 1.9 times for the median pair, up to 21 times (overload on the 30-floor building).
 
 ## The stop-time pair: 3-tick stops and the express car

@@ -244,7 +244,8 @@ class Preset:
     """One traffic pattern plus how its result is read."""
 
     number: int
-    """Preset number 1-8, as in ``traffic-patterns.md``; also feeds the seed."""
+    """Preset number 1-8, in the order of ``docs/write-up/4-trial-design.md``; also feeds the
+    seed."""
     name: str
     """Short label, e.g. ``"morning-rush"``."""
     mixture: Callable[[Building], Mixture]
@@ -355,7 +356,7 @@ PRESETS = (
         1, "baseline",
         lambda b: ((1.0, Flow("interfloor", uniform(), uniform())),),
         steady_arrival, DEMAND,
-        hypothesis="All four close; establishes the paired per-seed difference "
+        hypothesis="Every scheduler close; establishes the paired per-seed difference "
                    "others are read against.",
     ),
     # Arrivals ramp up from zero over the first quarter of the expected span

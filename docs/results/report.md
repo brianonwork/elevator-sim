@@ -23,21 +23,21 @@ The winner per preset and building. Where several schedulers are listed, none of
 
 Not an outcome, but it decides whether a scheduler is usable in real time.
 
-| Scheduler | mean seconds | worst cell |
+| Scheduler | mean CPU seconds | worst cell |
 |---|---|---|
-| eta-cost | 0.19 | 1.6 |
-| eta-cost-fair | 0.18 | 1.6 |
-| nearest-car | 0.10 | 0.8 |
-| nearest-car-eta | 0.14 | 0.9 |
-| round-robin | 0.08 | 0.4 |
-| zone-based | 0.09 | 0.3 |
-| express | 0.14 | 0.8 |
+| eta-cost | 0.15 | 1.4 |
+| eta-cost-fair | 0.15 | 1.5 |
+| nearest-car | 0.07 | 0.3 |
+| nearest-car-eta | 0.11 | 0.8 |
+| round-robin | 0.06 | 0.2 |
+| zone-based | 0.07 | 0.2 |
+| express | 0.12 | 0.7 |
 
 ### Per preset
 
 #### 1. baseline
 
-*Hypothesis.* All four close; establishes the paired per-seed difference others are read against.
+*Hypothesis.* Every scheduler close; establishes the paired per-seed difference others are read against.
 
 Demand 0.75 of the fleet's nominal throughput (0.200/tick on B1).
 
@@ -184,21 +184,21 @@ The winner per preset and building. Where several schedulers are listed, none of
 
 Not an outcome, but it decides whether a scheduler is usable in real time.
 
-| Scheduler | mean seconds | worst cell |
+| Scheduler | mean CPU seconds | worst cell |
 |---|---|---|
-| eta-cost | 0.31 | 3.7 |
-| eta-cost-fair | 0.31 | 3.6 |
-| nearest-car | 0.10 | 0.4 |
-| nearest-car-eta | 0.22 | 2.2 |
-| round-robin | 0.09 | 0.3 |
-| zone-based | 0.10 | 0.4 |
-| express | 0.21 | 1.5 |
+| eta-cost | 0.26 | 3.2 |
+| eta-cost-fair | 0.26 | 3.1 |
+| nearest-car | 0.08 | 0.3 |
+| nearest-car-eta | 0.18 | 1.9 |
+| round-robin | 0.07 | 0.2 |
+| zone-based | 0.07 | 0.3 |
+| express | 0.17 | 1.2 |
 
 ### Per preset
 
 #### 1. baseline
 
-*Hypothesis.* All four close; establishes the paired per-seed difference others are read against.
+*Hypothesis.* Every scheduler close; establishes the paired per-seed difference others are read against.
 
 Demand 0.75 of the fleet's nominal throughput (0.200/tick on B1).
 

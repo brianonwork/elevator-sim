@@ -90,6 +90,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     skipped as already done rather than re-run. The warning covers every row in
     runs.csv, not only the presets and buildings selected.
 
+    Warns too when the results were recorded under different source than today's
+    (``runner.source_changed``): resume cannot tell, so the user has to.
+
     Args:
         args: Parsed arguments; uses ``preset`` and ``building`` (lists, empty = all) and
             ``jobs`` (``None`` = one worker per CPU).
@@ -113,6 +116,12 @@ def cmd_run(args: argparse.Namespace) -> int:
               f"rate and will not be re-run; delete them to regenerate:")
         for line in stale[:5]:
             print(f"  {line}")
+    # Resume skips a finished cell whatever code produced it, so say when the code moved.
+    if runner.source_changed():
+        print(f"warning: the simulator or trial source has changed since {runner.RESULTS} was "
+              f"recorded (or it has no {runner.STAMP}); finished cells will not be re-run. "
+              f"If the change can move results, delete {runner.RESULTS} and "
+              f"{runner.SERIES} and run again.")
     result = runner.run_all(todo, jobs=args.jobs)
     print(f"{result.written} new rows in {runner.RESULTS}; "
           f"{result.series_backfilled} cell(s) had only their series backfilled")

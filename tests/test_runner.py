@@ -2,6 +2,9 @@
 
 import csv
 
+import pytest
+
+from elevator_sim.trials import runner
 from elevator_sim.trials.paired import paired_diff
 from elevator_sim.trials.presets import BY_NAME, BY_NUMBER, rate_for, traffic_for
 from elevator_sim.trials.runner import (
@@ -14,7 +17,10 @@ from elevator_sim.trials.runner import (
     run_all,
     run_cell,
     run_fairness,
+    source_changed,
     stale_cells,
+    stamp_path,
+    variant_of,
 )
 
 B2 = BY_NAME["B2"]  # the smallest building: 2 cars, 200 requests
@@ -225,6 +231,54 @@ class TestStaleCells:
 
     def test_a_missing_results_file_has_nothing_stale(self, tmp_path):
         assert stale_cells(tmp_path / "nothing.csv") == []
+
+
+class TestSourceStamp:
+    """Resume keys on cell identity, so results recorded under different code look finished.
+    The stamp beside ``runs.csv`` is what lets ``run`` say so."""
+
+    @staticmethod
+    def one_cell():
+        preset = BY_NUMBER[1]
+        return Cell(preset.name, "B2", "plain", "round-robin", preset.seeds(B2)[0])
+
+    def test_a_fresh_run_is_stamped_and_reads_as_current(self, tmp_path):
+        path = tmp_path / "runs.csv"
+        run_all([self.one_cell()], path=path, jobs=1)
+        assert stamp_path(path).read_text().strip() == runner.source_fingerprint()
+        assert not source_changed(path)
+
+    def test_results_recorded_under_other_code_are_flagged_and_keep_their_stamp(
+        self, tmp_path, monkeypatch
+    ):
+        path = tmp_path / "runs.csv"
+        run_all([self.one_cell()], path=path, jobs=1)
+        recorded = stamp_path(path).read_text()
+        monkeypatch.setattr(runner, "source_fingerprint", lambda: "edited-since")
+
+        assert source_changed(path)
+        # The cell still counts as done, which is exactly why the warning has to exist.
+        assert run_all([self.one_cell()], path=path, jobs=1).written == 0
+        assert stamp_path(path).read_text() == recorded
+
+    def test_results_with_no_stamp_are_flagged(self, tmp_path):
+        path = tmp_path / "runs.csv"
+        run_all([self.one_cell()], path=path, jobs=1)
+        stamp_path(path).unlink()
+        assert source_changed(path)
+
+    def test_no_results_means_nothing_to_flag(self, tmp_path):
+        assert not source_changed(tmp_path / "nothing.csv")
+
+    def test_the_fingerprint_ignores_the_report_and_the_command_lines(self):
+        hashed = {p.as_posix() for p in runner.fingerprinted_files()}
+        assert "trials/runner.py" in hashed and "algorithms/controller.py" in hashed
+        assert not hashed & {"trials/report.py", "trials/cli.py", "cli.py"}
+
+
+def test_an_unknown_variant_name_is_a_key_error_naming_the_choices():
+    with pytest.raises(KeyError, match="no variant 'stop9'.*plain.*stop1"):
+        variant_of(BY_NUMBER[1], B2, "stop9")
 
 
 class TestFairness:

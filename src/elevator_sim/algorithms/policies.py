@@ -313,7 +313,8 @@ class ZoneBased:
                 The default 1.5 lets a home car be committed to half a load more than it
                 can seat at once (riders drop off along the way, freeing seats). If no
                 eligible car has the source in its zone and is under this threshold, the
-                request goes to ``inner`` over the whole fleet, ignoring ``candidates``.
+                request goes to ``inner`` over every eligible car: ``candidates`` when the
+                caller narrowed the choice, the whole fleet otherwise.
         """
         self.inner = inner
         self.load_factor = load_factor
@@ -322,7 +323,7 @@ class ZoneBased:
         self, state: SimulationState, assigned: Assignments, headings: Headings,
         request: Request, candidates: Sequence[ElevatorView] | None = None,
     ) -> int:
-        """Return the zone car for the source, or fall back to ``inner`` over the fleet.
+        """Return the zone car for the source, or fall back to ``inner`` over the candidates.
 
         Args:
             state: This tick's snapshot; its config gives the fleet and building size.
@@ -341,8 +342,9 @@ class ZoneBased:
             if zone[car.id][0] <= request.source <= zone[car.id][1]
             and car.load + len(assigned.get(car.id, ())) < self.load_factor * car.capacity
         ]
-        # No home car available: pass None so ``inner`` considers every car.
-        return self.inner(state, assigned, headings, request, home or None)
+        # No home car available: ``inner`` chooses among the cars the caller allowed (None =
+        # every car). Widening to the whole fleet here would undo an outer policy's narrowing.
+        return self.inner(state, assigned, headings, request, home or candidates)
 
 
 def top_band(num_floors: int) -> tuple[int, int]:
@@ -420,6 +422,9 @@ class Express:
 
         Returns:
             The chosen car id.
+
+        Raises:
+            ValueError: ``candidates`` holds no car on the side that owns this trip.
         """
         is_express_trip = request.source in self.floors and request.dest in self.floors
         # Keep exactly the side that owns this trip: express cars for a band trip, locals
@@ -428,4 +433,11 @@ class Express:
             car for car in choices(state, request, candidates)
             if (car.id in self.express_cars) == is_express_trip
         ]
+        # Only a caller's narrowing can empty a side; say so rather than let ``inner`` fail
+        # on an empty list.
+        if not allowed:
+            side = "express" if is_express_trip else "local"
+            raise ValueError(
+                f"request {request.id!r}: no {side} car among the candidates to take it"
+            )
         return self.inner(state, assigned, headings, request, allowed)

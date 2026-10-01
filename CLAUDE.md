@@ -62,7 +62,9 @@ The scripts that did the recomputation used `report.group`, `cell_rows`, `column
 
 If the experiments ever have to be re-run after a change that moves results, **delete
 `docs/results/data/runs.csv` and `runs-windows.csv` first**: the runner's resume keys on
-cell identity and would keep stale rows. Then `uv run elevator-trials run`, `report`, and
+cell identity and would keep stale rows. `run` warns when the source has changed since the
+CSVs were recorded (`runs.source-hash` beside them, written by a run that starts from
+nothing), but it cannot tell whether the change moves results. Then `uv run elevator-trials run`, `report`, and
 recompute every count in the four documents above and the Working conventions bullet below.
 
 ## Architecture
@@ -122,7 +124,7 @@ dev group. Keep `src/elevator_sim/` stdlib-only.
 
 - `README.md` — the deliverable front page: how to run the simulator and the trials, time
   spent, key assumptions and top improvements. Everything else it points to in
-  `docs/write-up/` rather than repeating. Its `## Time spent` section is still `_TBD_`.
+  `docs/write-up/` rather than repeating.
 - `docs/results/` — generated output (`runs.csv`, `runs-windows.csv`, `report.md`, and
   `figures/` with one folder per experiment).
 - `docs/write-up/` — `1-overview.md`, `2-code-architecture.md`, `3-algorithms.md`,

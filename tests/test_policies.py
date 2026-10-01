@@ -252,3 +252,19 @@ class TestExpress:
         s = state([view(0, 1), view(1, 1), view(2, 30)])
         policy = Express(EtaCost(), express_cars=frozenset({2}), floors=express_floors(30))
         assert policy(s, empty(3), idle(3), req("n", 1, 25)) == 2
+
+    def test_a_zone_policy_inside_cannot_hand_a_local_trip_to_the_express_car(self):
+        # Floor 12 is car 1's zone (11-20 of 30) and car 1 is over-committed, so the zone
+        # policy falls back. The express car 2 stands on floor 12 and would be nearest, but
+        # a local trip is never the express car's: the fallback stays among the locals.
+        s = state([view(0, 1), view(1, 1), view(2, 12)])
+        assigned = empty(3) | {1: [req(f"q{i}", 15, 16) for i in range(12)]}
+        policy = Express(ZoneBased(), express_cars=frozenset({2}), floors=express_floors(30))
+        assert policy(s, assigned, idle(3), req("n", 12, 14)) == 0
+
+    def test_no_car_on_the_owning_side_is_a_clear_error(self):
+        # A caller narrowed to the local cars only, then an express trip arrives.
+        s = state([view(0, 1), view(1, 1), view(2, 1)])
+        policy = Express(EtaCost(), express_cars=frozenset({2}), floors=express_floors(30))
+        with pytest.raises(ValueError, match="no express car among the candidates"):
+            policy(s, empty(3), idle(3), req("n", 1, 25), [s.elevators[0], s.elevators[1]])

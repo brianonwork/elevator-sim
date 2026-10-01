@@ -126,7 +126,7 @@ every rider in the run, including the first ones, served while the cars spread o
 | Worst trip per stretch | list of ticks, one per stretch | Time series of binned maxima | For each 150-tick stretch of the run in which anyone asked, the longest trip among those who asked in it; 2–20 stretches per run, to spot a fleet falling behind |
 | Shortest trip time | ticks | Minimum (extreme) | The fastest rider's trip |
 | Shortest wait | ticks | Minimum (extreme) | The fastest rider's wait |
-| Computer time | seconds | Wall-clock measurement, not a passenger statistic | Real time our machine took to simulate the whole run, scheduler included; compare within one machine only |
+| Computer time | seconds | Processor-time measurement, not a passenger statistic | Processor time our machine spent simulating the whole run, scheduler included; compare within one machine only |
 
 **Why these numbers.**
 

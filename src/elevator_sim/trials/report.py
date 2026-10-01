@@ -449,18 +449,18 @@ def express_table(rows: Sequence[dict]) -> list[str]:
 
 
 def cost_table(rows: Sequence[dict]) -> list[str]:
-    """Return seconds per run by scheduler. Real-time dispatch has to be affordable.
+    """Return CPU seconds per run by scheduler. Real-time dispatch has to be affordable.
 
     Args:
         rows: ``runs.csv`` rows.
 
     Returns:
-        Markdown table lines: each scheduler's mean and worst wall-clock seconds per run.
+        Markdown table lines: each scheduler's mean and worst CPU seconds per run.
     """
     by_scheduler: dict[str, list[float]] = {}
     for r in rows:
         by_scheduler.setdefault(r["scheduler"], []).append(float(r["seconds"]))
-    lines = header("Scheduler", "mean seconds", "worst cell")
+    lines = header("Scheduler", "mean CPU seconds", "worst cell")
     for scheduler in SCHEDULERS:
         seconds = by_scheduler.get(scheduler, [])
         if seconds:
@@ -685,7 +685,7 @@ def experiment_section(rows: Sequence[dict], experiment: str, variant: str) -> l
         "",
         *ranking_table(rows, variant),
         "",
-        # Wall-clock seconds per run, by scheduler, over this experiment's runs only.
+        # CPU seconds per run, by scheduler, over this experiment's runs only.
         "### Compute cost",
         "",
         "Not an outcome, but it decides whether a scheduler is usable in real time.",

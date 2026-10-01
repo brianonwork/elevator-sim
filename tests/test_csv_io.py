@@ -119,7 +119,7 @@ def test_a_blank_line_is_skipped_even_with_trailing_commas(tmp_path):
 
 
 def test_an_extra_column_is_allowed(tmp_path):
-    # traffic.write_requests adds a flow column; only ragged rows are an error.
+    # A file may carry columns the simulator does not use; only ragged rows are an error.
     path = tmp_path / "r.csv"
     path.write_text("time,id,source,dest,flow\n0,p1,1,5,up\n")
     assert [r.id for r in read_requests(path)] == ["p1"]

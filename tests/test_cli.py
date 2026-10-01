@@ -70,6 +70,17 @@ def test_stalled_run_exits_1(tmp_path, capsys, monkeypatch):
     assert "50 ticks" in capsys.readouterr().err
 
 
+def test_a_replay_that_does_not_terminate_exits_1(tmp_path, capsys, monkeypatch):
+    # The default scheduler predicts drop-offs by replaying the controller; a controller bug
+    # shows up there first, as a RuntimeError, before the engine's own stall guard.
+    def never_ends(*args, **kwargs):
+        raise RuntimeError("controller replay did not terminate")
+
+    monkeypatch.setattr("elevator_sim.algorithms.policies.simulate", never_ends)
+    assert run_cli(tmp_path) == 1
+    assert capsys.readouterr().err == "elevator-sim: controller replay did not terminate\n"
+
+
 # -- fleet configuration flags ---------------------------------------------------------
 
 

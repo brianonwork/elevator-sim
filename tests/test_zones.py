@@ -63,6 +63,15 @@ class TestAssignment:
         only = [cars[0], cars[1], cars[3]]
         assert ZoneBased()(s, empty(4), idle(4), req("n", 45, 50), only) == 0
 
+    def test_the_fallback_never_picks_a_car_the_caller_excluded(self):
+        # Car 2 owns floor 45 and is standing on it, but the caller has excluded it. With no
+        # home car left among the candidates, the fallback must still choose among them:
+        # an outer policy (``Express``) relies on its narrowing being final.
+        cars = [view(0, 1), view(1, 1), view(2, 45), view(3, 1)]
+        s = state(cars, floors=60)
+        only = [cars[0], cars[1], cars[3]]
+        assert ZoneBased()(s, empty(4), idle(4), req("n", 45, 50), only) == 0
+
 
 class TestParking:
     def test_an_idle_car_with_a_park_floor_drifts_to_it(self):
